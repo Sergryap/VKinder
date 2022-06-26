@@ -20,7 +20,7 @@ create table if not exists merging_users(
     merging_city varchar(50) not null,
     merging_age integer,
     merging_gender integer
-)
+);
 
 
 /* Фото*/
@@ -36,4 +36,4 @@ create table if not exits user_session(
     id serial primary key,
     user_id_vk varchar(20) not null references user(user_id_vk),
     date integer
-)
+);
