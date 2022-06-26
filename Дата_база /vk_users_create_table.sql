@@ -34,6 +34,6 @@ create table if not exists photos(
 /* Сесссия*/
 create table if not exits user_session(
     id serial primary key,
-    user_id_vk varchar(20) not null references user(user_id_vk),
+    user_id_vk varchar(20) not null references user_vk(user_id_vk),
     date integer
 );
