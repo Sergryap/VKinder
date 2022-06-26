@@ -5,6 +5,8 @@ from Token import token as token_bot
 import vk_api
 from vk_api.longpoll import VkLongPoll, VkEventType
 import time
+import datetime as dt
+from pprint import pprint
 
 
 class VkAgent:
@@ -20,13 +22,11 @@ class VkAgent:
 		self.params = {'access_token': tok, 'v': '5.131'}
 		self.author = 0
 
-
 	def __set_params(self, zero=True):
 		"""Установка параметров для get запроса при неудачном запросе"""
 		self.author = 0 if zero else self.author + 1
 		print(f'Токен заменен на >>> {self.author}!')
 		self.params = {'access_token': self.token[self.author], 'v': '5.131'}
-
 
 	def get_stability(self, method, params_delta, i=0):
 		"""
@@ -49,27 +49,86 @@ class VkAgent:
 		count = i + 1
 		return self.get_stability(method, params_delta, i=count)
 
-
 	def get_message(self):
+		enter_age = False
 		for event in self.longpool.listen():
 			if event.type == VkEventType.MESSAGE_NEW:
 				if event.to_me:
 					msg = event.text.lower()
-					id = event.user_id
-					self.messages_var(id, msg)
+					if not enter_age:
+						user_info = self.msg_processing_not_enter_age(event, msg)
+						enter_age = True
+					if enter_age and msg.isdigit():
+						age = int(msg)
+						self.update_year_birth(user_info, age)
+						# следует запись в БД
+						enter_age = False
+						pprint(user_info)
 
+	def msg_processing_not_enter_age(self, event, msg):
+		"""
+		Обработка сообщения пользователя, когда не вводится возраст
+		"""
+		user_id = event.user_id
+		user_info = self.set_search_users(user_id)
+		# следует запись в БД
+		pprint(user_info)
+		self.messages_var(user_id, msg)
+		if not user_info['year_birth']:  # При наличии БД, проверку сделать по запросу из БД
+			self.send_message(user_id, "Укажите ваш возраст")
+		return user_info
 
-	def send_message(self, id, some_text):
-		self.vk_session.method("messages.send", {"user_id": id, "message": some_text, "random_id": 0})
+	@staticmethod
+	def update_year_birth(user_info: dict, age: int):
+		"""Обновление данных о годе рождения в словаре user_info на основании указанного возраста"""
+		year_now = dt.datetime.date(dt.datetime.now()).year
+		birth_year = year_now - age
+		user_info['year_birth'] = birth_year
 
+	@staticmethod
+	def get_birth_date(res: dict):
+		"""
+		Получение данных о возрасте пользователя
+		:return: кортеж с датой: str и годом рождения: int
+		"""
+		birth_date = None if 'bdate' not in res['response'][0] else res['response'][0]['bdate']
+		birth_year = None
+		if birth_date:
+			birth_date = None if len(birth_date.split('.')) < 3 else birth_date
+			birth_year = time.strptime(birth_date, "%d.%m.%Y").tm_year if birth_date else None
+		return birth_date, birth_year
 
-	def messages_var(self, id, msg):
+	def set_search_users(self, user_id):
+		"""
+		Получение данных о пользователе по его id
+		:return: словарь с данными по пользователю
+		"""
+		params_delta = {'user_ids': user_id, 'fields': 'country,city,bdate,sex'}
+		response = self.get_stability('users.get', params_delta)
+		if response:
+			birth_info = self.get_birth_date(response)
+			birth_date = birth_info[0]
+			birth_year = birth_info[1]
+			return {
+				'user_id': user_id,
+				'city_id': response['response'][0]['city']['id'],
+				'sex': response['response'][0]['sex'],
+				'first_name': response['response'][0]['first_name'],
+				'last_name': response['response'][0]['last_name'],
+				'bdate': birth_date,
+				'year_birth': birth_year
+			}
+
+	def send_message(self, user_id, some_text):
+		self.vk_session.method("messages.send", {"user_id": user_id, "message": some_text, "random_id": 0})
+
+	def messages_var(self, user_id, msg):
 		if msg in ['да', 'конечно', 'yes', 'хочу']:
-			return self.send_message(id, "Сейчас сделаю")
+			return self.send_message(user_id, "Сейчас сделаю")
 		if msg in ['нет', 'не надо', 'не хочу']:
-			return self.send_message(id, "Очень жаль. Ждем в следующий раз")
+			return self.send_message(user_id, "Очень жаль. Ждем в следующий раз")
 		else:
-			return self.send_message(id, "Я могу подобрать варианты знакомства для вас")
+			return self.send_message(user_id, "Я могу подобрать варианты знакомства для вас")
 
 
 if __name__ == '__main__':
