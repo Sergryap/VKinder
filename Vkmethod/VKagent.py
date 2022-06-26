@@ -20,6 +20,7 @@ class VkAgent:
 	def __init__(self, tok=token[0]):
 		self.params = {'access_token': tok, 'v': '5.131'}
 		self.author = 0
+		self.search_offset = 0
 
 	def __set_params(self, zero=True):
 		"""Установка параметров для get запроса при неудачном запросе"""
@@ -29,7 +30,7 @@ class VkAgent:
 
 	def get_stability(self, method, params_delta, i=0):
 		"""
-		Метод get запроса с защитой на случай блокировки токена
+		Метод get запроса с защитой на случайной блокировки токена
 		При неудачном запросе делается рекурсивный вызов
 		с другим токеном и установкой этого токена по умолчанию
 		через функцию __set_params
@@ -51,30 +52,67 @@ class VkAgent:
 
 	def get_message(self):
 		enter_age = False
+		user_info = None
+		users_search = {}
 		for event in self.longpool.listen():
 			if event.type == VkEventType.MESSAGE_NEW:
 				if event.to_me:
 					msg = event.text.lower()
-					if not enter_age:
+					if not enter_age and not user_info:
 						result = self.msg_processing_not_enter_age(event, msg)
 						user_info = result[0]
 						enter_age = result[1]
 					if enter_age and msg.isdigit():
 						age = int(msg)
 						self.update_year_birth(user_info, age)
-						# следует обновление данных в БД
 						enter_age = False
-						pprint(user_info)
+					if user_info['year_birth']:
+						users_search.update(self.users_search(user_info))
+					# здесь следует запись в базу данных user_info и users_search
+					pprint(users_search)
+
+	def users_search(self, users_info):
+		"""Поиск подходящих пользователей"""
+		year_now = dt.datetime.date(dt.datetime.now()).year
+		year_birth = users_info['year_birth']
+		city = users_info['city_id']
+		sex = 1 if users_info['sex'] == 2 else 2
+		age_from = year_now - year_birth - 1
+		age_to = year_now - year_birth + 1
+		fields = 'country,sex,city,bdate'
+		users_search = {}
+		params_delta = {
+			'city': city,
+			'sex': sex,
+			'age_from': age_from,
+			'age_to': age_to,
+			'fields': fields,
+			'count': 10,
+			'offset': self.search_offset
+		}
+		response = self.get_stability('users.search', params_delta)
+		self.search_offset += 10
+		if response and response['response']['items']:
+			for item in response['response']['items']:
+				user_id = item['id']
+				users_search[user_id] = {
+					'city_id': None if 'city' not in item else item['city']['id'],
+					'sex': item['sex'],
+					'first_name': item['first_name'],
+					'last_name': item['last_name'],
+					'bdate': None if 'bdate' not in item else item['bdate']
+				}
+		return users_search
 
 	def msg_processing_not_enter_age(self, event, msg):
 		"""
 		Обработка сообщения пользователя, когда не вводится возраст
-		:return: словарь с данными о пользователе и enter_age: bool, указывающее на необходимость ввода возраста
+		:return: словарь с данными о пользователе и
+		enter_age: bool, указывающее на необходимость ввода возраста при следующей иттерации
 		"""
 		user_id = event.user_id
+		enter_age = False
 		user_info = self.set_search_users(user_id)
-		# следует запись в БД
-		pprint(user_info)
 		self.messages_var(user_id, msg)
 		if not user_info['year_birth']:  # После создания БД, проверку сделать по запросу из БД
 			self.send_message(user_id, "Укажите ваш возраст")
