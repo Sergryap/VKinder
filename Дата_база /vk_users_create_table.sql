@@ -11,7 +11,7 @@ create table if not exists user(
 
 
 /*Объединненые пользователи*/
-create table if not merging_users(
+create table if not exists merging_users(
     id serial primary key,
     user_id_vk varchar(20) not null references user(user_id_vk),
     merging_user_id varchar(20) not null unique,
