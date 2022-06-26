@@ -30,7 +30,7 @@ class VkAgent:
 
 	def get_stability(self, method, params_delta, i=0):
 		"""
-		Метод get запроса с защитой на случайной блокировки токена
+		Метод get запроса с защитой на случай блокировки токена
 		При неудачном запросе делается рекурсивный вызов
 		с другим токеном и установкой этого токена по умолчанию
 		через функцию __set_params
@@ -54,23 +54,41 @@ class VkAgent:
 		enter_age = False
 		user_info = None
 		users_search = {}
+		search_flag = True
+		step = 0
 		for event in self.longpool.listen():
 			if event.type == VkEventType.MESSAGE_NEW:
 				if event.to_me:
 					msg = event.text.lower()
+					user_id = event.user_id
 					if not enter_age and not user_info:
+						# получение данных о пользователе первый раз
+						# при отсутствии данных о возрасте enter_age будет True
 						result = self.msg_processing_not_enter_age(event, msg)
 						user_info = result[0]
 						enter_age = result[1]
 					if enter_age and msg.isdigit():
+						# обновление данных после указания возраста пользователем
 						age = int(msg)
 						self.update_year_birth(user_info, age)
 						enter_age = False
-					if user_info['year_birth']:
-						users_search.update(self.users_search(user_info))
-						self.send_message(event.user_id, "Для продолжения поиска введите любой символ")
-					# здесь следует запись в базу данных user_info и users_search
-					pprint(users_search)
+					if user_info['year_birth'] and search_flag:
+						# поиск подходящих пользоватлей для пользователя из чата
+						search_info = self.users_search(user_info)
+						users_search.update(search_info)
+						search_flag = False
+						# здесь будет запись в базу данных из словарей user_info и users_search
+						pprint(users_search)
+					if not search_flag:
+						value = list(search_info.values())[step]
+						info = f"{value['first_name']} {value['last_name']}\n{value['url']}\n\n"
+						step += 1
+						self.send_message(user_id, info)
+						self.send_message(user_id, "Для продолжения поиска введите любой символ")
+						if step == len(value) - 1:
+							step = 0
+							search_flag = True
+
 
 	def users_search(self, users_info):
 		"""Поиск подходящих пользователей"""
@@ -101,7 +119,8 @@ class VkAgent:
 					'sex': item['sex'],
 					'first_name': item['first_name'],
 					'last_name': item['last_name'],
-					'bdate': None if 'bdate' not in item else item['bdate']
+					'bdate': None if 'bdate' not in item else item['bdate'],
+					'url': rf"https://vk.com/id{user_id}"
 				}
 		return users_search
 
