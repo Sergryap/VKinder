@@ -1,5 +1,5 @@
 /*Пользователь главный*/
-create table if not exists user(
+create table if not exists user_vk(
     id serial primary key,
     user_id_vk varchar(20) not null,
     user_surname varchar(50) not null,
