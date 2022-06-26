@@ -1,7 +1,6 @@
 import requests
 import json
 import os
-from Token import token as token_bot
 import vk_api
 from vk_api.longpoll import VkLongPoll, VkEventType
 import time
@@ -14,7 +13,7 @@ class VkAgent:
 	with open(os.path.join(os.getcwd(), "token.txt"), encoding='utf-8') as file:
 		token = [t.strip() for t in file.readlines()]
 
-	vk_session = vk_api.VkApi(token=token_bot)
+	vk_session = vk_api.VkApi(token=token[0])
 	session_api = vk_session.get_api()
 	longpool = VkLongPoll(vk_session)
 
