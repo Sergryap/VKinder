@@ -34,6 +34,7 @@ class VkAgent:
 		При неудачном запросе делается рекурсивный вызов
 		с другим токеном и установкой этого токена по умолчанию
 		через функцию __set_params
+		Для работы функции необходим текстовый файл token.txt с построчно записанными токенами
 		"""
 		print(f'Глубина рекурсии: {i}/токен: {self.author}')
 		method_url = self.url + method
@@ -56,27 +57,30 @@ class VkAgent:
 				if event.to_me:
 					msg = event.text.lower()
 					if not enter_age:
-						user_info = self.msg_processing_not_enter_age(event, msg)
-						enter_age = True
+						result = self.msg_processing_not_enter_age(event, msg)
+						user_info = result[0]
+						enter_age = result[1]
 					if enter_age and msg.isdigit():
 						age = int(msg)
 						self.update_year_birth(user_info, age)
-						# следует запись в БД
+						# следует обновление данных в БД
 						enter_age = False
 						pprint(user_info)
 
 	def msg_processing_not_enter_age(self, event, msg):
 		"""
 		Обработка сообщения пользователя, когда не вводится возраст
+		:return: словарь с данными о пользователе и enter_age: bool, указывающее на необходимость ввода возраста
 		"""
 		user_id = event.user_id
 		user_info = self.set_search_users(user_id)
 		# следует запись в БД
 		pprint(user_info)
 		self.messages_var(user_id, msg)
-		if not user_info['year_birth']:  # При наличии БД, проверку сделать по запросу из БД
+		if not user_info['year_birth']:  # После создания БД, проверку сделать по запросу из БД
 			self.send_message(user_id, "Укажите ваш возраст")
-		return user_info
+			enter_age = True
+		return user_info, enter_age
 
 	@staticmethod
 	def update_year_birth(user_info: dict, age: int):
