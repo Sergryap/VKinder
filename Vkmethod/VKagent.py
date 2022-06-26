@@ -75,7 +75,7 @@ class VkAgent:
 					if user_info['year_birth'] and search_flag:
 						# поиск подходящих пользоватлей для пользователя из чата
 						search_info = self.users_search(user_info)
-						users_search.update(search_info)
+						users_search.update(search_info)  # вместо этого будет дозапись в базу данных
 						search_flag = False
 						# здесь будет запись в базу данных из словарей user_info и users_search
 						pprint(users_search)
@@ -89,6 +89,12 @@ class VkAgent:
 							step = 0
 							search_flag = True
 
+	def photo_search(self, user_id):
+		"""
+		Поиск топ-3 фото пользователя.
+		Для этой функции будет отдельный модуль
+		"""
+		pass
 
 	def users_search(self, users_info):
 		"""Поиск подходящих пользователей"""
@@ -115,6 +121,7 @@ class VkAgent:
 			for item in response['response']['items']:
 				user_id = item['id']
 				users_search[user_id] = {
+					'user_id': user_id,
 					'city_id': None if 'city' not in item else item['city']['id'],
 					'sex': item['sex'],
 					'first_name': item['first_name'],
