@@ -24,7 +24,7 @@ create table if not exists merging_users(
 
 
 /* Фото*/
-create table if not exits photos(
+create table if not exists photos(
     id serial primary key,
     photo_link text,
     merging_user_id varchar(20) not null references merging_users(merging_user_id),
