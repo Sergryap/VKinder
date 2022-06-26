@@ -68,6 +68,7 @@ class VkAgent:
 						enter_age = False
 					if user_info['year_birth']:
 						users_search.update(self.users_search(user_info))
+						self.send_message(event.user_id, "Для продолжения поиска введите любой символ")
 					# здесь следует запись в базу данных user_info и users_search
 					pprint(users_search)
 
@@ -112,7 +113,7 @@ class VkAgent:
 		"""
 		user_id = event.user_id
 		enter_age = False
-		user_info = self.set_search_users(user_id)
+		user_info = self.set_info_users(user_id)
 		self.messages_var(user_id, msg)
 		if not user_info['year_birth']:  # После создания БД, проверку сделать по запросу из БД
 			self.send_message(user_id, "Укажите ваш возраст")
@@ -139,7 +140,7 @@ class VkAgent:
 			birth_year = time.strptime(birth_date, "%d.%m.%Y").tm_year if birth_date else None
 		return birth_date, birth_year
 
-	def set_search_users(self, user_id):
+	def set_info_users(self, user_id):
 		"""
 		Получение данных о пользователе по его id
 		:return: словарь с данными по пользователю
