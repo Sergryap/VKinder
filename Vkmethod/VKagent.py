@@ -97,7 +97,7 @@ class VkAgent:
 		pass
 
 	def users_search(self, users_info):
-		"""Поиск подходящих пользователей"""
+		"""Поиск подходящих пользователей по данным users_info"""
 		year_now = dt.datetime.date(dt.datetime.now()).year
 		year_birth = users_info['year_birth']
 		city = users_info['city_id']
