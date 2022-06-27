@@ -1,5 +1,5 @@
 /*Пользователь главный*/
-create table if not exists user_vk(
+create table if not exists user_log(
     id serial primary key,
     user_id_vk varchar(20) not null,
     user_surname varchar(50) not null,
@@ -13,7 +13,7 @@ create table if not exists user_vk(
 /*Объединненые пользователи*/
 create table if not exists merging_users(
     id serial primary key,
-    user_id_vk varchar(20) not null references user_vk(user_id_vk),
+    user_id_vk varchar(20) not null references user_log(user_id_vk),
     merging_user_id varchar(20) not null unique,
     merging_surname varchar(50) not null,
     merging_first_name varchar(50) not null,
