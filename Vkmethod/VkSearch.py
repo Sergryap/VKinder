@@ -4,6 +4,9 @@ import os
 
 
 class VkSearch:
+	"""
+	Класс методов поиска и сортировки
+	"""
 	url = 'https://api.vk.com/method/'
 	with open(os.path.join(os.getcwd(), "token.txt"), encoding='utf-8') as file:
 		token = [t.strip() for t in file.readlines()]
