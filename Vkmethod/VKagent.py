@@ -6,49 +6,15 @@ from vk_api.longpoll import VkLongPoll, VkEventType
 import time
 import datetime as dt
 from pprint import pprint
+from VkSearch import VkSearch
 
 
-class VkAgent:
-	url = 'https://api.vk.com/method/'
-	with open(os.path.join(os.getcwd(), "token.txt"), encoding='utf-8') as file:
-		token = [t.strip() for t in file.readlines()]
+class VkAgent(VkSearch):
 
-	vk_session = vk_api.VkApi(token=token[0])
-	session_api = vk_session.get_api()
-	longpool = VkLongPoll(vk_session)
-
-	def __init__(self, tok=token[0]):
-		self.params = {'access_token': tok, 'v': '5.131'}
-		self.author = 0
-		self.search_offset = 0
-
-	def __set_params(self, zero=True):
-		"""Установка параметров для get запроса при неудачном запросе"""
-		self.author = 0 if zero else self.author + 1
-		print(f'Токен заменен на >>> {self.author}!')
-		self.params = {'access_token': self.token[self.author], 'v': '5.131'}
-
-	def get_stability(self, method, params_delta, i=0):
-		"""
-		Метод get запроса с защитой на случай блокировки токена
-		При неудачном запросе делается рекурсивный вызов
-		с другим токеном и установкой этого токена по умолчанию
-		через функцию __set_params
-		Для работы функции необходим текстовый файл token.txt с построчно записанными токенами
-		"""
-		print(f'Глубина рекурсии: {i}/токен: {self.author}')
-		method_url = self.url + method
-		response = requests.get(method_url, params={**self.params, **params_delta}).json()
-		if 'response' in response:
-			return response
-		elif i == len(self.token) - 1:
-			return False
-		elif self.author < len(self.token) - 1:
-			self.__set_params(zero=False)
-		elif self.author == len(self.token) - 1:
-			self.__set_params()
-		count = i + 1
-		return self.get_stability(method, params_delta, i=count)
+	def __init__(self):
+		super().__init__()
+		self.vk_session = vk_api.VkApi(token=self.token[0])
+		self.longpool = VkLongPoll(self.vk_session)
 
 	def get_message(self):
 		enter_age = False
@@ -84,52 +50,11 @@ class VkAgent:
 						info = f"{value['first_name']} {value['last_name']}\n{value['url']}\n\n"
 						step += 1
 						self.send_message(user_id, info)
+						self.send_top_photos(value['user_id'], user_id)
 						self.send_message(user_id, "Для продолжения поиска введите любой символ")
 						if step == len(value) - 1:
 							step = 0
 							search_flag = True
-
-	def photo_search(self, user_id):
-		"""
-		Поиск топ-3 фото пользователя.
-		Для этой функции будет отдельный модуль
-		"""
-		pass
-
-	def users_search(self, users_info):
-		"""Поиск подходящих пользователей по данным users_info"""
-		year_now = dt.datetime.date(dt.datetime.now()).year
-		year_birth = users_info['year_birth']
-		city = users_info['city_id']
-		sex = 1 if users_info['sex'] == 2 else 2
-		age_from = year_now - year_birth - 1
-		age_to = year_now - year_birth + 1
-		fields = 'country,sex,city,bdate'
-		users_search = {}
-		params_delta = {
-			'city': city,
-			'sex': sex,
-			'age_from': age_from,
-			'age_to': age_to,
-			'fields': fields,
-			'count': 10,
-			'offset': self.search_offset
-		}
-		response = self.get_stability('users.search', params_delta)
-		self.search_offset += 10
-		if response and response['response']['items']:
-			for item in response['response']['items']:
-				user_id = item['id']
-				users_search[user_id] = {
-					'user_id': user_id,
-					'city_id': None if 'city' not in item else item['city']['id'],
-					'sex': item['sex'],
-					'first_name': item['first_name'],
-					'last_name': item['last_name'],
-					'bdate': None if 'bdate' not in item else item['bdate'],
-					'url': rf"https://vk.com/id{user_id}"
-				}
-		return users_search
 
 	def msg_processing_not_enter_age(self, event, msg):
 		"""
@@ -166,29 +91,39 @@ class VkAgent:
 			birth_year = time.strptime(birth_date, "%d.%m.%Y").tm_year if birth_date else None
 		return birth_date, birth_year
 
-	def set_info_users(self, user_id):
-		"""
-		Получение данных о пользователе по его id
-		:return: словарь с данными по пользователю
-		"""
-		params_delta = {'user_ids': user_id, 'fields': 'country,city,bdate,sex'}
-		response = self.get_stability('users.get', params_delta)
-		if response:
-			birth_info = self.get_birth_date(response)
-			birth_date = birth_info[0]
-			birth_year = birth_info[1]
-			return {
-				'user_id': user_id,
-				'city_id': response['response'][0]['city']['id'],
-				'sex': response['response'][0]['sex'],
-				'first_name': response['response'][0]['first_name'],
-				'last_name': response['response'][0]['last_name'],
-				'bdate': birth_date,
-				'year_birth': birth_year
-			}
-
 	def send_message(self, user_id, some_text):
-		self.vk_session.method("messages.send", {"user_id": user_id, "message": some_text, "random_id": 0})
+		try:
+			self.vk_session.method("messages.send", {"user_id": user_id, "message": some_text, "random_id": 0})
+		except requests.exceptions.ConnectionError:
+			time.sleep(1)
+			self.send_message(user_id, some_text)
+
+	def _users_lock(self, user_id):
+		"""
+		Получение информации о том закрытый или нет профиль пользователя
+		:return: bool
+		"""
+		params_delta = {'user_ids': user_id}
+		response = self.get_stability('users.get', params_delta)
+		if response and 'is_closed' in response['response'][0]:
+			return response['response'][0]['is_closed']
+		return True
+
+	def send_top_photos(self, user_id, owner_id):
+		"""Отправка топ-3 фотографий пользователя"""
+		self.send_message(owner_id, "Подождите, получаем топ-3 фото пользователя")
+		top_photo = self.top_photo(user_id)
+		if not self._users_lock(user_id) and top_photo:
+			attachment = ''
+			for photo in top_photo:
+				attachment += f"photo{user_id}_{photo[0]},"
+			self.vk_session.method("messages.send", {"user_id": owner_id, "attachment": attachment[:-1], "random_id": 0})
+		elif top_photo:
+			self.send_message(owner_id, "Извините, но у пользователя закрытый профиль.\n Вы можете посмотреть фото по ссылкам")
+			for photo in top_photo:
+				self.send_message(owner_id, photo[1])
+		else:
+			self.send_message(owner_id, "Извините, но у пользователя нет доступных фотографий")
 
 	def messages_var(self, user_id, msg):
 		if msg in ['да', 'конечно', 'yes', 'хочу']:

@@ -1,6 +1,7 @@
 import requests
 import json
 import os
+import datetime as dt
 
 
 class VkSearch:
@@ -8,11 +9,11 @@ class VkSearch:
 	Класс методов поиска и сортировки
 	"""
 	url = 'https://api.vk.com/method/'
-	with open(os.path.join(os.getcwd(), "token.txt"), encoding='utf-8') as file:
-		token = [t.strip() for t in file.readlines()]
 
-	def __init__(self, tok=token[0]):
-		self.params = {'access_token': tok, 'v': '5.131'}
+	def __init__(self):
+		with open(os.path.join(os.getcwd(), "token.txt"), encoding='utf-8') as file:
+			self.token = [t.strip() for t in file.readlines()]
+		self.params = {'access_token': self.token[0], 'v': '5.131'}
 		self.author = 0
 		self.search_offset = 0
 
@@ -46,30 +47,15 @@ class VkSearch:
 
 	def __albums_id(self, owner_id):
 		"""
-		Cоздает список словарей, содержащих название и id
-		альбомы пользователя
+		Cоздает список, содержащий id альбомов пользователя
 		"""
 		params_delta = {'owner_id': owner_id, 'need_system': '1'}
 		response = self.get_stability('photos.getAlbums', params_delta)
-		if response:
+		if response and response['response']['items']:
 			albums_id = []
 			for item in response['response']['items']:
-				albums_id.append({
-					'title': self._path_normalizer(item['title']),
-					'id': item['id']
-				})
+				albums_id.append(item['id'])
 			return albums_id
-		return -1, -1
-
-	@staticmethod
-	def _path_normalizer(name_path):
-		"""Удаление и замена запрещенных и нежелательных символов в имени папки"""
-		symbol_no = rf"""*:'"%!@?$/\\|&<>+.)("""
-		name = '_'.join(name_path.split()).strip(symbol_no)
-		for s in symbol_no:
-			if s in name:
-				name = name.replace(s, '_')
-		return name
 
 	@staticmethod
 	def __get_items(item: dict):
@@ -83,21 +69,19 @@ class VkSearch:
 			if size['height'] and size['width'] and size['height'] > 0 and size['width'] > 0:
 				if size['height'] * size['width'] > area:
 					area = size['height'] * size['width']
-					image_res = f"{size['height']} * {size['width']}"
 					photo_url = size['url']
 			else:
 				flag = False
 				for i in 'wzyx':
 					for size1 in item['sizes']:
 						if size1['type'] == i:
-							image_res = "нет данных"
 							photo_url = size1['url']
 							flag = True
 							break
 					if flag:
 						break
 				break
-		return image_res, photo_url
+		return photo_url
 
 	def __photos_get(self, owner_id, album_id):
 		"""
@@ -109,28 +93,32 @@ class VkSearch:
 		if response:
 			photos_info = []
 			for item in response['response']['items']:
-				photo_url = self.__get_items(item)[1]
+				photo_url = self.__get_items(item)
 				likes = item['likes']['count']
 				count_likes = str(likes)
 				# Добавляем словарь в список photos_info
 				photos_info.append({
 					'photo_url': photo_url,
-					'count_likes': count_likes
+					'count_likes': count_likes,
+					'photo_id': item['id']
 				})
-		return photos_info
+			return photos_info
 
-	def photo_search(self, owner_id):
+	def top_photo(self, owner_id):
 		"""
 		Поиск топ-3 фото пользователя по всем альбомам пользователя
 		"""
+
 		def key_sort(elem):
 			return elem['count_likes']
 
 		total_photos_info = []
-		for album_id in self.__albums_id(owner_id):
-			total_photos_info += self.__photos_get(owner_id, album_id['id'])
-		photos_sorted = sorted(total_photos_info, key=key_sort, reverse=True)[:2]
-		return [f['photo_url'] for f in photos_sorted]
+		albums = self.__albums_id(owner_id)
+		if albums:
+			for album_id in albums:
+				total_photos_info += self.__photos_get(owner_id, album_id)
+				photos_sorted = sorted(total_photos_info, key=key_sort, reverse=True)[:3]
+				return [(f['photo_id'], f['photo_url']) for f in photos_sorted]
 
 	def users_search(self, users_info):
 		"""Поиск подходящих пользователей по данным users_info"""
@@ -187,3 +175,7 @@ class VkSearch:
 				'bdate': birth_date,
 				'year_birth': birth_year
 			}
+
+if __name__ == '__main__':
+	serg = VkSearch()
+	print(serg.top_photo(51166388))
