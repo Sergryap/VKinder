@@ -17,56 +17,58 @@ class VkAgent(VkSearch):
 		self.longpool = VkLongPoll(self.vk_session)
 
 	def get_message(self):
-		enter_age = False
-		user_info = None
-		search_flag = True
-		step = 0
+		count = 1
 		for event in self.longpool.listen():
 			if event.type == VkEventType.MESSAGE_NEW:
 				if event.to_me:
 					msg = event.text.lower()
 					user_id = event.user_id
-					if not enter_age and not user_info:
-						# получение данных о пользователе первый раз
-						# при отсутствии данных о возрасте enter_age будет True
-						result = self.get_data_user(event, msg)
-						user_info = result[0]
-						enter_age = result[1]
-						exit_flag = result[2]
-						if exit_flag == 1:
-							break
-						if exit_flag == 2:
-							continue
-					if enter_age and msg.isdigit():
-						# обновление данных после указания возраста пользователем
-						age = int(msg)
-						self.update_year_birth(user_info, age)
-						enter_age = False
-					if user_info['year_birth'] and search_flag:
-						# поиск подходящих пользоватлей для пользователя из чата
-						search_info = self.users_search(user_info)
-						pprint(search_info)
-						# users_search.update(search_info)  # вместо этого будет дозапись в базу данных
-						search_flag = False
-						# здесь будет запись в базу данных из словарей user_info и users_search
-					if not search_flag:
-						value = list(search_info.values())[step]
-						info = f"{value['first_name']} {value['last_name']}\n{value['url']}\n\n"
-						step += 1
-						self.send_message(user_id, info)
-						self.send_top_photos(value['user_id'], user_id)
-						self.send_message(user_id, "Для продолжения поиска введите любой символ")
-						if step == len(value) - 1:
-							step = 0
-							search_flag = True
+					if count == 1:
+						result = self.get_data_user(user_id, msg)
+					else:
+						while True:
+							result = self.handler_func(user_id, msg, count, result)
+							count += 1
+							if result[4]:
+								break
+					count += 1
 
-	def get_data_user(self, event, msg):
+	def handler_func(self, user_id, msg, count, result=None):
+		if count == 2:
+			user_info = result[0]
+			enter_age = result[1]
+			exit_flag = result[2]
+			if enter_age and msg.isdigit():
+				age = int(msg)
+				self.update_year_birth(user_info, age)
+			return user_info, True, None, 0, False
+		else:
+			user_info = result[0]
+			search_flag = result[1]
+			search_info = result[2]
+			step = result[3]
+			if search_flag:
+				search_info = self.users_search(user_info)
+				search_flag = False
+				return user_info, search_flag, search_info, step, False
+			else:
+				value = list(search_info.values())[step]
+				info = f"{value['first_name']} {value['last_name']}\n{value['url']}\n\n"
+				step += 1
+				self.send_message(user_id, info)
+				self.send_top_photos(value['user_id'], user_id)
+				self.send_message(user_id, "Для продолжения поиска введите любой символ")
+				if step == len(value) - 1:
+					step = 0
+					search_flag = True
+				return user_info, search_flag, search_info, step, True
+
+	def get_data_user(self, user_id, msg):
 		"""
 		Получение данных о пользователе при первом обращении к боту
 		:return: словарь с данными о пользователе и флаг
 		enter_age: bool, указывающий на необходимость запроса возраста
 		"""
-		user_id = event.user_id
 		enter_age = False
 		user_info = self.get_info_users(user_id)
 		exit_flag = self.messages_var(user_id, msg)
@@ -101,7 +103,8 @@ class VkAgent(VkSearch):
 			attachment = ''
 			for photo in top_photo:
 				attachment += f"photo{user_id}_{photo[0]},"
-			self.vk_session.method("messages.send", {"user_id": owner_id, "attachment": attachment[:-1], "random_id": 0})
+			self.vk_session.method("messages.send", {"user_id": owner_id, "attachment": attachment[:-1],
+			                                         "random_id": 0})
 		elif top_photo:
 			self.send_message(owner_id, "Извините, но у пользователя закрытый профиль.\n Вы можете посмотреть фото по ссылкам")
 			for photo in top_photo:
