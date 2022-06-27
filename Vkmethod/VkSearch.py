@@ -2,6 +2,7 @@ import requests
 import json
 import os
 import datetime as dt
+import time
 
 
 class VkSearch:
@@ -12,7 +13,9 @@ class VkSearch:
 
 	def __init__(self):
 		with open(os.path.join(os.getcwd(), "token.txt"), encoding='utf-8') as file:
-			self.token = [t.strip() for t in file.readlines()]
+			token = [t.strip() for t in file.readlines()]
+		self.token_bot = token[0]
+		self.token = token[1:]
 		self.params = {'access_token': self.token[0], 'v': '5.131'}
 		self.author = 0
 		self.search_offset = 0
@@ -155,7 +158,7 @@ class VkSearch:
 				}
 		return users_search
 
-	def set_info_users(self, user_id):
+	def get_info_users(self, user_id):
 		"""
 		Получение данных о пользователе по его id
 		:return: словарь с данными по пользователю
@@ -175,6 +178,27 @@ class VkSearch:
 				'bdate': birth_date,
 				'year_birth': birth_year
 			}
+
+	@staticmethod
+	def get_birth_date(res: dict):
+		"""
+		Получение данных о возрасте пользователя
+		:return: кортеж с датой: str и годом рождения: int
+		"""
+		birth_date = None if 'bdate' not in res['response'][0] else res['response'][0]['bdate']
+		birth_year = None
+		if birth_date:
+			birth_date = None if len(birth_date.split('.')) < 3 else birth_date
+			birth_year = time.strptime(birth_date, "%d.%m.%Y").tm_year if birth_date else None
+		return birth_date, birth_year
+
+	@staticmethod
+	def update_year_birth(user_info: dict, age: int):
+		"""Обновление данных о годе рождения в словаре user_info на основании указанного возраста"""
+		year_now = dt.datetime.date(dt.datetime.now()).year
+		birth_year = year_now - age
+		user_info['year_birth'] = birth_year
+
 
 if __name__ == '__main__':
 	serg = VkSearch()
