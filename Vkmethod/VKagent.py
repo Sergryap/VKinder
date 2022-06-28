@@ -35,11 +35,11 @@ class VkAgent(VkSearch):
 		if result[2] in [2, 3]:
 			return None, None, None, None, True, 1
 		if result[5] == 2:
-			return self.step_2_func(result, msg)
+			return self.step_2_func(result, msg, user_id)
 		else:
 			return self.step_other_func(result, user_id)
 
-	def step_2_func(self, result, msg):
+	def step_2_func(self, result, msg, user_id):
 		user_info = result[0]
 		enter_age = result[1]
 		if enter_age and msg.isdigit():
