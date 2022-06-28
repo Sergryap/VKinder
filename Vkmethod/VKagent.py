@@ -31,11 +31,11 @@ class VkAgent(VkSearch):
 	def handler_func(self, user_id, msg, result):
 		if result[5] == 1:
 			return self.get_data_user(user_id, msg)
+		if result[2] in [2, 3]:
+			return None, None, None, None, True, 1
 		if result[5] == 2:
 			user_info = result[0]
 			enter_age = result[1]
-			if result[2] == 2:
-				return user_info, False, None, 0, True, 2
 			if enter_age and msg.isdigit():
 				age = int(msg)
 				self.update_year_birth(user_info, age)
@@ -45,7 +45,6 @@ class VkAgent(VkSearch):
 				return user_info, True, None, 0, True, 2
 			else:
 				return user_info, True, None, 0, False, 3
-
 		else:
 			user_info = result[0]
 			search_flag = result[1]
@@ -76,7 +75,7 @@ class VkAgent(VkSearch):
 		enter_age = False
 		user_info = self.get_info_users(user_id)
 		exit_flag = self.messages_var(user_id, msg)
-		if not user_info['year_birth']:  # После создания БД, проверку сделать по запросу из БД
+		if not user_info['year_birth'] and not exit_flag:  # После создания БД, проверку сделать по запросу из БД
 			self.send_message(user_id, "Укажите ваш возраст")
 			enter_age = True
 		return user_info, enter_age, exit_flag, None, enter_age, 2
@@ -107,8 +106,10 @@ class VkAgent(VkSearch):
 			attachment = ''
 			for photo in top_photo:
 				attachment += f"photo{user_id}_{photo[0]},"
-			self.vk_session.method("messages.send", {"user_id": owner_id, "attachment": attachment[:-1],
-			                                         "random_id": 0})
+			self.vk_session.method("messages.send", {
+								"user_id": owner_id,
+								"attachment": attachment[:-1],
+								"random_id": 0})
 		elif top_photo:
 			self.send_message(owner_id, "Извините, но у пользователя закрытый профиль.\n Вы можете посмотреть фото по ссылкам")
 			for photo in top_photo:
@@ -119,7 +120,7 @@ class VkAgent(VkSearch):
 	def messages_var(self, user_id, msg):
 		if msg in ['да', 'конечно', 'yes', 'хочу', 'давай', 'буду']:
 			self.send_message(user_id, "Сейчас сделаю")
-			return 1
+			return False
 		if msg in ['нет', 'не надо', 'не хочу', 'потом']:
 			self.send_message(user_id, "Очень жаль. Ждем в следующий раз.\n Вы все еще можете передумать: Да, Нет")
 			return 2
