@@ -17,31 +17,35 @@ class VkAgent(VkSearch):
 		self.longpool = VkLongPoll(self.vk_session)
 
 	def get_message(self):
-		count = 1
+		result = None, None, None, None, None, 1
 		for event in self.longpool.listen():
 			if event.type == VkEventType.MESSAGE_NEW:
 				if event.to_me:
 					msg = event.text.lower()
 					user_id = event.user_id
-					if count == 1:
-						result = self.get_data_user(user_id, msg)
-					else:
-						while True:
-							result = self.handler_func(user_id, msg, count, result)
-							count += 1
-							if result[4]:
-								break
-					count += 1
+					while True:
+						result = self.handler_func(user_id, msg, result)
+						if result[4]:
+							break
 
-	def handler_func(self, user_id, msg, count, result=None):
-		if count == 2:
+	def handler_func(self, user_id, msg, result):
+		if result[5] == 1:
+			return self.get_data_user(user_id, msg)
+		if result[5] == 2:
 			user_info = result[0]
 			enter_age = result[1]
-			exit_flag = result[2]
+			if result[2] == 2:
+				return user_info, False, None, 0, True, 2
 			if enter_age and msg.isdigit():
 				age = int(msg)
 				self.update_year_birth(user_info, age)
-			return user_info, True, None, 0, False
+				return user_info, True, None, 0, False, 3
+			elif enter_age and not msg.isdigit():
+				self.send_message(user_id, "Введите верный возраст")
+				return user_info, True, None, 0, True, 2
+			else:
+				return user_info, True, None, 0, False, 3
+
 		else:
 			user_info = result[0]
 			search_flag = result[1]
@@ -50,7 +54,7 @@ class VkAgent(VkSearch):
 			if search_flag:
 				search_info = self.users_search(user_info)
 				search_flag = False
-				return user_info, search_flag, search_info, step, False
+				return user_info, search_flag, search_info, step, False, None
 			else:
 				value = list(search_info.values())[step]
 				info = f"{value['first_name']} {value['last_name']}\n{value['url']}\n\n"
@@ -61,7 +65,7 @@ class VkAgent(VkSearch):
 				if step == len(value) - 1:
 					step = 0
 					search_flag = True
-				return user_info, search_flag, search_info, step, True
+				return user_info, search_flag, search_info, step, True, None
 
 	def get_data_user(self, user_id, msg):
 		"""
@@ -75,7 +79,7 @@ class VkAgent(VkSearch):
 		if not user_info['year_birth']:  # После создания БД, проверку сделать по запросу из БД
 			self.send_message(user_id, "Укажите ваш возраст")
 			enter_age = True
-		return user_info, enter_age, exit_flag
+		return user_info, enter_age, exit_flag, None, enter_age, 2
 
 	def send_message(self, user_id, some_text):
 		try:
@@ -115,12 +119,13 @@ class VkAgent(VkSearch):
 	def messages_var(self, user_id, msg):
 		if msg in ['да', 'конечно', 'yes', 'хочу', 'давай', 'буду']:
 			self.send_message(user_id, "Сейчас сделаю")
-		if msg in ['нет', 'не надо', 'не хочу', 'потом']:
-			self.send_message(user_id, "Очень жаль. Ждем в следующий раз")
 			return 1
+		if msg in ['нет', 'не надо', 'не хочу', 'потом']:
+			self.send_message(user_id, "Очень жаль. Ждем в следующий раз.\n Вы все еще можете передумать: Да, Нет")
+			return 2
 		else:
 			self.send_message(user_id, "Подобрать варианты для знакомств? Да/Нет")
-			return 2
+			return 3
 
 
 if __name__ == '__main__':
