@@ -1,10 +1,6 @@
 import requests
-import json
-import os
 import vk_api
 from vk_api.longpoll import VkLongPoll, VkEventType
-import time
-import datetime as dt
 from pprint import pprint
 from VkSearch import VkSearch
 
