@@ -51,8 +51,10 @@ class VkAgent(VkSearch):
             return [user_info, True, None, 0, False, 3]
 
     def step_other_func(self, result, user_id, msg):
-        if len(result) == 7:
-            self.add_favorite(result, msg, user_id)
+        if msg == '♥':
+            return self.get_favorite(result, user_id)
+        if msg == '+♥':
+            return self.add_favorite(result, user_id)
         user_info = result[0]
         search_flag = result[1]
         search_info = result[2]
@@ -62,12 +64,10 @@ class VkAgent(VkSearch):
             search_flag = False
             return [user_info, search_flag, search_info, step, False, None]
         else:
-            value = list(search_info.values())[step]
-            info = f"{value['first_name']} {value['last_name']}\n{value['url']}\n\n"
             step += 1
-            self.send_message(user_id, info)
-            self.send_top_photos(value['user_id'], user_id)
-            self.send_message(user_id, "Для продолжения нажмите далее", buttons=['♥', 'Далее'])
+            value = list(search_info.values())[step]
+            self.send_info_users(value, user_id)
+            self.send_message(user_id, "Выберите действие", buttons=['+♥', 'Далее', '♥'])
             if step == len(value) - 1:
                 step = 0
                 search_flag = True
@@ -93,12 +93,16 @@ class VkAgent(VkSearch):
             "message": some_text,
             "random_id": 0}
         if button:
-            keyboard = VkKeyboard(one_time=True)
+            keyboard = VkKeyboard()
             keyboard.add_button(title, VkKeyboardColor.PRIMARY)
             params['keyboard'] = keyboard.get_keyboard()
         if buttons:
-            keyboard = VkKeyboard(one_time=True)
-            buttons_color = [VkKeyboardColor.SECONDARY, VkKeyboardColor.NEGATIVE]
+            if len(buttons) == 2:
+                keyboard = VkKeyboard(one_time=True)
+                buttons_color = [VkKeyboardColor.SECONDARY, VkKeyboardColor.NEGATIVE]
+            if len(buttons) == 3:
+                keyboard = VkKeyboard(inline=True)
+                buttons_color = [VkKeyboardColor.SECONDARY, VkKeyboardColor.NEGATIVE, VkKeyboardColor.SECONDARY]
             for btn, btn_color in zip(buttons, buttons_color):
                 keyboard.add_button(btn, btn_color)
             params['keyboard'] = keyboard.get_keyboard()
@@ -140,12 +144,25 @@ class VkAgent(VkSearch):
             self.send_message(user_id, "Подобрать варианты для знакомств? Да/Нет", buttons=["Да", "Нет"])
             return 3
 
-    def add_favorite(self, result, msg, user_id):
-        if msg == '♥':
-            self.fav.update({result[6]['user_id']: result[6]})
-            send_msg = f"Пользователь {result[6]['user_id']}:\n{result[6]['first_name']} {result[6]['last_name']} добавлен в избранное"
-            self.send_message(user_id, send_msg)
+    def add_favorite(self, result, user_id):
+        self.fav.update({result[6]['user_id']: result[6]})
+        send_msg = f"Пользователь {result[6]['user_id']}:\n{result[6]['first_name']} {result[6]['last_name']} добавлен в избранное"
+        self.send_message(user_id, send_msg)
+        self.send_message(user_id, "Выберите действие", buttons=['+♥', 'Далее', '♥'])
+        return result
 
+    def send_info_users(self, value, user_id):
+        info = f"{value['first_name']} {value['last_name']}\n{value['url']}\n\n"
+        self.send_message(user_id, info)
+        self.send_top_photos(value['user_id'], user_id)
+
+    def get_favorite(self, result, user_id):
+        self.send_message(user_id, "Вывожу избранных пользователей\n\n")
+        for user_fav in self.fav.values():
+            self.send_info_users(user_fav, user_id)
+        self.send_message(user_id, "-"*50)
+        self.send_message(user_id, "Выберите действие", buttons=['+♥', 'Далее', '♥'])
+        return result
 
 
 if __name__ == '__main__':
