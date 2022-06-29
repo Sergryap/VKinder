@@ -1,7 +1,8 @@
 import requests
 import vk_api
 from vk_api.longpoll import VkLongPoll, VkEventType
-from pprint import pprint
+from vk_api.keyboard import VkKeyboard, VkKeyboardColor
+import time
 from VkSearch import VkSearch
 
 
@@ -63,7 +64,7 @@ class VkAgent(VkSearch):
 			step += 1
 			self.send_message(user_id, info)
 			self.send_top_photos(value['user_id'], user_id)
-			self.send_message(user_id, "Для продолжения поиска введите любой символ")
+			self.send_message(user_id, "Для продолжения нажмите далее", button=True, com='Далее')
 			if step == len(value) - 1:
 				step = 0
 				search_flag = True
@@ -83,12 +84,20 @@ class VkAgent(VkSearch):
 			enter_age = True
 		return user_info, enter_age, exit_flag, None, enter_age, 2
 
-	def send_message(self, user_id, some_text):
+	def send_message(self, user_id, some_text, button=False, com=''):
+		params = {
+			"user_id": user_id,
+			"message": some_text,
+			"random_id": 0}
+		if button:
+			keyboard = VkKeyboard(one_time=True)
+			keyboard.add_button(com, VkKeyboardColor.PRIMARY)
+			params['keyboard'] = keyboard.get_keyboard()
 		try:
-			self.vk_session.method("messages.send", {"user_id": user_id, "message": some_text, "random_id": 0})
+			self.vk_session.method("messages.send", params)
 		except requests.exceptions.ConnectionError:
 			time.sleep(1)
-			self.send_message(user_id, some_text)
+			self.send_message(user_id, some_text, button, com)
 
 	def _users_lock(self, user_id):
 		"""
