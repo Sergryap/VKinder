@@ -158,6 +158,17 @@ class VkSearch:
                 }
         return users_search
 
+    def _users_lock(self, user_id):
+        """
+        Получение информации о том закрытый или нет профиль пользователя
+        :return: bool
+        """
+        params_delta = {'user_ids': user_id}
+        response = self.get_stability('users.get', params_delta)
+        if response and 'is_closed' in response['response'][0]:
+            return response['response'][0]['is_closed']
+        return True
+
     def get_info_users(self, user_id):
         """
         Получение данных о пользователе по его id
