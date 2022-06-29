@@ -12,9 +12,10 @@ class VkAgent(VkSearch):
         super().__init__()
         self.vk_session = vk_api.VkApi(token=self.token_bot)
         self.longpool = VkLongPoll(self.vk_session)
+        self.fav = {}
 
     def get_message(self):
-        result = None, None, None, None, None, 1
+        result = [None, None, None, None, None, 1]
         for event in self.longpool.listen():
             if event.type == VkEventType.MESSAGE_NEW:
                 if event.to_me:
@@ -30,11 +31,11 @@ class VkAgent(VkSearch):
         if result[5] == 1:
             return self.get_data_user(user_id, msg)
         if result[2] in [2, 3]:
-            return None, None, None, None, True, 1
+            return [None, None, None, None, True, 1]
         if result[5] == 2:
             return self.step_2_func(result, msg, user_id)
         else:
-            return self.step_other_func(result, user_id)
+            return self.step_other_func(result, user_id, msg)
 
     def step_2_func(self, result, msg, user_id):
         user_info = result[0]
@@ -42,14 +43,16 @@ class VkAgent(VkSearch):
         if enter_age and msg.isdigit():
             age = int(msg)
             self.update_year_birth(user_info, age)
-            return user_info, True, None, 0, False, 3
+            return [user_info, True, None, 0, False, 3]
         elif enter_age and not msg.isdigit():
             self.send_message(user_id, "Введите верный возраст")
-            return user_info, True, None, 0, True, 2
+            return [user_info, True, None, 0, True, 2]
         else:
-            return user_info, True, None, 0, False, 3
+            return [user_info, True, None, 0, False, 3]
 
-    def step_other_func(self, result, user_id):
+    def step_other_func(self, result, user_id, msg):
+        if len(result) == 7:
+            self.add_favorite(result, msg, user_id)
         user_info = result[0]
         search_flag = result[1]
         search_info = result[2]
@@ -57,18 +60,18 @@ class VkAgent(VkSearch):
         if search_flag:
             search_info = self.users_search(user_info)
             search_flag = False
-            return user_info, search_flag, search_info, step, False, None
+            return [user_info, search_flag, search_info, step, False, None]
         else:
             value = list(search_info.values())[step]
             info = f"{value['first_name']} {value['last_name']}\n{value['url']}\n\n"
             step += 1
             self.send_message(user_id, info)
             self.send_top_photos(value['user_id'], user_id)
-            self.send_message(user_id, "Для продолжения нажмите далее", button=True, title='Далее')
+            self.send_message(user_id, "Для продолжения нажмите далее", buttons=['♥', 'Далее'])
             if step == len(value) - 1:
                 step = 0
                 search_flag = True
-            return user_info, search_flag, search_info, step, True, None
+            return [user_info, search_flag, search_info, step, True, None, value]
 
     def get_data_user(self, user_id, msg):
         """
@@ -82,7 +85,7 @@ class VkAgent(VkSearch):
         if not user_info['year_birth'] and not exit_flag:  # После создания БД, проверку сделать по запросу из БД
             self.send_message(user_id, "Укажите ваш возраст")
             enter_age = True
-        return user_info, enter_age, exit_flag, None, enter_age, 2
+        return [user_info, enter_age, exit_flag, None, enter_age, 2]
 
     def send_message(self, user_id, some_text, button=False, buttons=False, title=''):
         params = {
@@ -95,7 +98,7 @@ class VkAgent(VkSearch):
             params['keyboard'] = keyboard.get_keyboard()
         if buttons:
             keyboard = VkKeyboard(one_time=True)
-            buttons_color = [VkKeyboardColor.PRIMARY, VkKeyboardColor.NEGATIVE]
+            buttons_color = [VkKeyboardColor.SECONDARY, VkKeyboardColor.NEGATIVE]
             for btn, btn_color in zip(buttons, buttons_color):
                 keyboard.add_button(btn, btn_color)
             params['keyboard'] = keyboard.get_keyboard()
@@ -136,6 +139,13 @@ class VkAgent(VkSearch):
         else:
             self.send_message(user_id, "Подобрать варианты для знакомств? Да/Нет", buttons=["Да", "Нет"])
             return 3
+
+    def add_favorite(self, result, msg, user_id):
+        if msg == '♥':
+            self.fav.update({result[6]['user_id']: result[6]})
+            send_msg = f"Пользователь {result[6]['user_id']}:\n{result[6]['first_name']} {result[6]['last_name']} добавлен в избранное"
+            self.send_message(user_id, send_msg)
+
 
 
 if __name__ == '__main__':
