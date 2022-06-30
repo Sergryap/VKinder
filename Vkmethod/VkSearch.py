@@ -169,19 +169,19 @@ class VkSearch:
             return response['response'][0]['is_closed']
         return True
 
-    def get_info_users(self, user_id):
+    def get_info_users(self):
         """
         Получение данных о пользователе по его id
         :return: словарь с данными по пользователю
         """
-        params_delta = {'user_ids': user_id, 'fields': 'country,city,bdate,sex'}
+        params_delta = {'user_ids': self.user_id, 'fields': 'country,city,bdate,sex'}
         response = self.get_stability('users.get', params_delta)
         if response:
             birth_info = self.get_birth_date(response)
             birth_date = birth_info[0]
             birth_year = birth_info[1]
             return {
-                'user_id': user_id,
+                'user_id': self.user_id,
                 'city_id': response['response'][0]['city']['id'],
                 'sex': response['response'][0]['sex'],
                 'first_name': response['response'][0]['first_name'],
