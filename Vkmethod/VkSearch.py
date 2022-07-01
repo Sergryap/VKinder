@@ -3,15 +3,18 @@ import json
 import os
 import datetime as dt
 import time
+from Date_base.DecorDB import DBConnect
+from Date_base.DecorDB import db_connect
 
 
-class VkSearch:
+class VkSearch(DBConnect):
     """
     Класс методов поиска и сортировки
     """
     url = 'https://api.vk.com/method/'
 
     def __init__(self):
+        super().__init__()
         with open(os.path.join(os.getcwd(), "token.txt"), encoding='utf-8') as file:
             token = [t.strip() for t in file.readlines()]
         self.token_bot = token[0]
@@ -169,6 +172,7 @@ class VkSearch:
             return response['response'][0]['is_closed']
         return True
 
+    # @db_connect(table="user", method="insert")
     def get_info_users(self):
         """
         Получение данных о пользователе по его id

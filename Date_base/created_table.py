@@ -1,75 +1,63 @@
-from unicodedata import name
-from sqlalchemy import Column, Integer, String, ForeignKey, Table, PrimaryKeyConstraint
+import urllib.parse
+from sqlalchemy import Column, ForeignKey, Integer, String, Date, Boolean, Table, MetaData, PrimaryKeyConstraint, schema
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy import create_engine
-# from sqlalchemy.dialects import postgresql -> у меня без этого не работал оставлю пока на всякий случай
-import urllib.parse
+from Date_base.password import password
+
 
 Base = declarative_base()
 
 
 class User(Base):
-    __tablename__ = 'User'
+	__tablename__ = 'user'
 
-    user_id = Column(Integer, primary_key=True)
-
-    last_name = Column(String)
-    first_name = Column(String)
-    city = Column(String)
-    bdate = Column(Integer)
-    year_birth = Column(Integer)
-    sex = Column(String)
-    mergingusers = relationship('MergingUsers', backref='User')
-
-
-class MergingUsers(Base):
-    __tablename__ = 'MergingUsers'
-
-    merging_id = Column(Integer, primary_key=True)
-    last_name = Column(String)
-    first_name = Column(String)
-    sex = Column(String)
-    photos = relationship('Photos', backref='MergingUsers')
-    id_user = Column(Integer, ForeignKey('User.user_id'))
+	user_id = Column(Integer, primary_key=True)
+	city_id = Column(Integer, nullable=False)
+	sex = Column(Integer, nullable=False)
+	first_name = Column(String(100), nullable=False)
+	last_name = Column(String(100), nullable=False)
+	bdate = Column(Date)
+	year_birth = Column(Integer)
+	merging_users = relationship('MergingUser', cascade="all,delete", backref='user')
+	ses = relationship('Ses', cascade="all,delete", backref='user')
 
 
-class Photos(Base):
-    __tablename__ = 'Photos'
+class Ses(Base):
+	__tablename__ = 'ses'
 
-    photo_id = Column(Integer, primary_key=True)
-    id_photo = Column(Integer, ForeignKey('MergingUsers.merging_id'))
-    photo_url = Column(String)
-    count_likes = Column(Integer)
+	session_id = Column(Integer, primary_key=True)
+	user_id = Column(Integer, ForeignKey("user.user_id"), nullable=False)
+	user_offset = Column(Integer)
+	date_connect = Column(Date)
 
 
-# photo_user = Table(
-#     'photo_user', Base.metadata,
-#     Column('photo_id', Integer, ForeignKey('Photos.photo_id')),
-#     Column('merging_id', Integer, ForeignKey('MergingUsers.merging_id')),
-#     PrimaryKeyConstraint('photo_id', 'merging_id',
-#                          name='photos_merging_users'))
+class MergingUser(Base):
+	__tablename__ = 'merging_user'
+	merging_user_id = Column(Integer, primary_key=True)
+	user_id = Column(Integer, ForeignKey("user.user_id"), nullable=False)
+	city_id = Column(Integer, nullable=False)
+	sex = Column(Integer, nullable=False)
+	first_name = Column(String(100), nullable=False)
+	last_name = Column(String(100), nullable=False)
+	bdate = Column(Date)
+	url = Column(String(300))
+	photos = relationship('Photo', cascade="all,delete", backref='merging_user')
 
-# Тут решил добавить избранные и черный список тут еще в плане тестов
 
-# class Favorites(Base):
-#     __tablename__ = 'Favorites'
+class Photo(Base):
+	__tablename__ = 'photo'
+	photo_id = Column(String(50), primary_key=True)
+	merging_user_id = Column(Integer, ForeignKey("merging_user.merging_user_id"), nullable=False)
+	photo_url = Column(String(300))
 
-#     favorites_id = Column(Integer, primary_key = True)
-#     last_name = Column(String)
-#     first_name = Column(String)
-#     id_user = Column(Integer, ForeignKey('User.user_id'))
 
-# class BlackList(Base):
-#     __tablename__ = 'BlackList'
+def create_db():
+	pswrd = urllib.parse.quote_plus(password)
+	db = f"postgresql://sergryap:{pswrd}@localhost:5432/vkinder"
+	engine = create_engine(db, echo=True)
+	Base.metadata.create_all(engine)
 
-#     black_list_id = Column(Integer, primary_key = True)
-#     last_name = Column(String)
-#     first_name = Column(String)
-#     id_user = Column(Integer, ForeignKey('User.user_id'))
 
 if __name__ == '__main__':
-    password = urllib.parse.quote_plus('admin')
-    db = f"postgresql://admin_vk:{password}@localhost:5432/admin"
-    engine = create_engine(db, echo=True)
-    Base.metadata.create_all(engine)
+	create_db()
