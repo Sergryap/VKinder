@@ -7,7 +7,7 @@ from VkSearch import VkSearch
 import os
 
 
-def get_message():
+def user_bot():
     with open(os.path.join(os.getcwd(), "token.txt"), encoding='utf-8') as file:
         token = [t.strip() for t in file.readlines()]
     vk_session = vk_api.VkApi(token=token[0])
@@ -181,4 +181,4 @@ class VkAgent(VkSearch):
 
 
 if __name__ == '__main__':
-    get_message()
+    user_bot()
