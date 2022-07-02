@@ -149,6 +149,7 @@ class VkSearch(DBConnect):
             'offset': self.search_offset
         }
         response = self.get_stability('users.search', params_delta)
+        self.user_offset_set()
         self.search_offset += 10
         if response and response['response']['items']:
             for item in response['response']['items']:
@@ -181,6 +182,7 @@ class VkSearch(DBConnect):
         Получение данных о пользователе по его id
         :return: словарь с данными по пользователю
         """
+
         params_delta = {'user_ids': self.user_id, 'fields': 'country,city,bdate,sex'}
         response = self.get_stability('users.get', params_delta)
         if response:

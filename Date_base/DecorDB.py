@@ -4,13 +4,14 @@ from datetime import date
 from functools import wraps
 from sqlalchemy import create_engine
 from sqlalchemy.orm.session import sessionmaker
-from Date_base.created_table import User, Ses, MergingUser, Photo
+from Date_base.created_table import User, Ses, OffsetUser, MergingUser, Photo
 
 
 # from Date_base.password import password
 
 
 class DBConnect():
+    """Класс взаимодействия с базой данных"""
     pswrd = urllib.parse.quote_plus('')
     db = f"postgresql+psycopg2://sergryap:{pswrd}@localhost:5432/vkinder"
     engine = create_engine(db, echo=False)
@@ -18,7 +19,7 @@ class DBConnect():
     Session = sessionmaker(bind=engine)
 
     def data_base_connector(self, table, method, data):
-
+        """Функция для декоратора db_connect"""
         if method == "insert" and data:
             if table == "User":
                 self.insert_db_table(data, table)
@@ -67,6 +68,7 @@ class DBConnect():
         return not sel
 
     def verify_insert_merging_user(self, merging_user_id):
+        """проверка вхождения пользователя merging_user в БД"""
         sel = self.conn.execute(f"""
             SELECT merging_user_id
             FROM public.merging_user
@@ -75,6 +77,7 @@ class DBConnect():
         return not sel
 
     def verify_insert_photo(self, photo_id):
+        """Проверка вхождения photo_id в БД"""
         sel = self.conn.execute(f"""
             SELECT photo_id
             FROM public.photo
@@ -95,16 +98,68 @@ class DBConnect():
     @staticmethod
     def date_format(birth_date: str):
         if birth_date:
-            date_info = time.strptime(birth_date, "%d.%m.%Y")
-            year = date_info.tm_year
-            month = date_info.tm_mon
-            day = date_info.tm_mday
-            month = month if month > 9 else str(f"0{month}")
-            day = day if day > 9 else str(f"0{day}")
-            return date.fromisoformat(f'{year}-{month}-{day}')
+            if len(birth_date.split(".")) == 3:
+                date_info = time.strptime(birth_date, "%d.%m.%Y")
+                year = date_info.tm_year
+                month = date_info.tm_mon
+                day = date_info.tm_mday
+                month = month if month > 9 else str(f"0{month}")
+                day = day if day > 9 else str(f"0{day}")
+                return date.fromisoformat(f'{year}-{month}-{day}')
+
+    def session_set(self):
+        """Запись данных о сессии пользователя"""
+        session = self.Session()
+        ses_add = Ses(user_id=self.user_id, user_offset=self.search_offset, date_connect=date.today())
+        session.add(ses_add)
+        session.commit()
+
+    def user_offset_get(self):
+        """Получение параметра self.search_offset из БД"""
+        sel = self.conn.execute(f"""
+                    SELECT MAX(offset_user)
+                    FROM public.offset_user
+                    WHERE user_id = {self.user_id}                    
+                    """).fetchone()
+        if sel[0]:
+            return sel[0]
+        return 0
+
+    def user_offset_set(self):
+        """
+        Запись параметра self.search_offset в БД
+        Для использования при повторном подключении пользователя
+        """
+        session = self.Session()
+        offset = 5 if self.search_offset == 0 else self.search_offset - 5
+        offset_add = OffsetUser(user_id=self.user_id, offset_user=offset)
+        session.add(offset_add)
+        session.commit()
+
+    def get_info_users_db(self):
+        """
+        Получение данных о пользователе из БД
+        """
+        sel = self.conn.execute(f"""
+                    SELECT *
+                    FROM public.user
+                    WHERE user_id = {self.user_id}
+                """).fetchone()
+        if sel:
+            return {
+                'user_id': sel[0],
+                'city_id': sel[1],
+                'sex': sel[2],
+                'first_name': sel[3],
+                'last_name': sel[4],
+                'bdate': sel[5],
+                'year_birth': sel[6]
+            }
 
 
 def db_connect(table, method):
+    """Декоратор для записи данных в БД"""
+
     def dbase(old_func):
         @wraps(old_func)
         def new_func(self, *args, **kwargs):
@@ -119,4 +174,4 @@ def db_connect(table, method):
 
 if __name__ == '__main__':
     x = DBConnect()
-    # print(x.verify_insert_photo("photo403915049_457239075"))
+    print(x.user_offset_set())

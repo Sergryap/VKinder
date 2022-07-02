@@ -11,9 +11,9 @@ def user_bot():
     with open(os.path.join(os.getcwd(), "token.txt"), encoding='utf-8') as file:
         token = [t.strip() for t in file.readlines()]
     vk_session = vk_api.VkApi(token=token[0])
-    longpool = VkLongPoll(vk_session)
-    users = []
     try:
+        longpool = VkLongPoll(vk_session)
+        users = []
         for event in longpool.listen():
             if event.type == VkEventType.MESSAGE_NEW:
                 if event.to_me:
@@ -22,15 +22,18 @@ def user_bot():
                     if user_id not in users:
                         exec(f"id_{user_id} = VkAgent({user_id})")
                         exec(f"id_{user_id}.msg = '{msg}'")
+                        exec(f"id_{user_id}.search_offset = id_{user_id}.user_offset_get()")
                         users.append(user_id)
                     else:
                         exec(f"id_{user_id}.msg = '{msg}'")
-
                     while True:
                         exec(f"id_{user_id}.result = id_{user_id}.handler_func()")
                         x = compile(f"id_{user_id}.result[4]", "test", "eval")
                         if eval(x):
                             break
+            if event.type == VkEventType.USER_OFFLINE:
+                user_id = event.user_id
+                exec(f"id_{user_id}.session_set()")
     except requests.exceptions.ReadTimeout:
         user_bot()
 
@@ -99,7 +102,8 @@ class VkAgent(VkSearch):
         enter_age: bool, указывающий на необходимость запроса возраста
         """
         enter_age = False
-        user_info = self.get_info_users()
+        user_info = self.get_info_users_db()
+        user_info = self.get_info_users() if not user_info else user_info
         exit_flag = self.messages_var()
         if not user_info['year_birth'] and not exit_flag:  # После создания БД, проверку сделать по запросу из БД
             self.send_message("Укажите ваш возраст")
@@ -140,9 +144,9 @@ class VkAgent(VkSearch):
             for photo in top_photo:
                 attachment += f"{photo['photo_id']},"
             self.vk_session.method("messages.send", {
-                        "user_id": self.user_id,
-                        "attachment": attachment[:-1],
-                        "random_id": 0})
+                "user_id": self.user_id,
+                "attachment": attachment[:-1],
+                "random_id": 0})
         elif top_photo:
             self.send_message("Извините, но у пользователя закрытый профиль.\n Вы можете посмотреть фото по ссылкам")
             for photo in top_photo:
