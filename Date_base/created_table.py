@@ -3,7 +3,7 @@ from sqlalchemy import Column, ForeignKey, Integer, String, Date, Boolean, Table
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy import create_engine
-from Date_base.password import password
+# from Date_base.password import password
 
 
 Base = declarative_base()
@@ -13,7 +13,7 @@ class User(Base):
 	__tablename__ = 'user'
 
 	user_id = Column(Integer, primary_key=True)
-	city_id = Column(Integer, nullable=False)
+	city_id = Column(Integer)
 	sex = Column(Integer, nullable=False)
 	first_name = Column(String(100), nullable=False)
 	last_name = Column(String(100), nullable=False)
@@ -36,7 +36,7 @@ class MergingUser(Base):
 	__tablename__ = 'merging_user'
 	merging_user_id = Column(Integer, primary_key=True)
 	user_id = Column(Integer, ForeignKey("user.user_id"), nullable=False)
-	city_id = Column(Integer, nullable=False)
+	city_id = Column(Integer)
 	sex = Column(Integer, nullable=False)
 	first_name = Column(String(100), nullable=False)
 	last_name = Column(String(100), nullable=False)
@@ -50,10 +50,11 @@ class Photo(Base):
 	photo_id = Column(String(50), primary_key=True)
 	merging_user_id = Column(Integer, ForeignKey("merging_user.merging_user_id"), nullable=False)
 	photo_url = Column(String(300))
+	count_likes = Column(Integer)
 
 
 def create_db():
-	pswrd = urllib.parse.quote_plus(password)
+	pswrd = urllib.parse.quote_plus('')
 	db = f"postgresql://sergryap:{pswrd}@localhost:5432/vkinder"
 	engine = create_engine(db, echo=True)
 	Base.metadata.create_all(engine)

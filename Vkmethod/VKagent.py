@@ -13,23 +13,26 @@ def user_bot():
     vk_session = vk_api.VkApi(token=token[0])
     longpool = VkLongPoll(vk_session)
     users = []
-    for event in longpool.listen():
-        if event.type == VkEventType.MESSAGE_NEW:
-            if event.to_me:
-                msg = event.text.lower()
-                user_id = event.user_id
-                if user_id not in users:
-                    exec(f"id_{user_id} = VkAgent({user_id})")
-                    exec(f"id_{user_id}.msg = '{msg}'")
-                    users.append(user_id)
-                else:
-                    exec(f"id_{user_id}.msg = '{msg}'")
+    try:
+        for event in longpool.listen():
+            if event.type == VkEventType.MESSAGE_NEW:
+                if event.to_me:
+                    msg = event.text.lower()
+                    user_id = event.user_id
+                    if user_id not in users:
+                        exec(f"id_{user_id} = VkAgent({user_id})")
+                        exec(f"id_{user_id}.msg = '{msg}'")
+                        users.append(user_id)
+                    else:
+                        exec(f"id_{user_id}.msg = '{msg}'")
 
-                while True:
-                    exec(f"id_{user_id}.result = id_{user_id}.handler_func()")
-                    x = compile(f"id_{user_id}.result[4]", "test", "eval")
-                    if eval(x):
-                        break
+                    while True:
+                        exec(f"id_{user_id}.result = id_{user_id}.handler_func()")
+                        x = compile(f"id_{user_id}.result[4]", "test", "eval")
+                        if eval(x):
+                            break
+    except requests.exceptions.ReadTimeout:
+        user_bot()
 
 
 class VkAgent(VkSearch):
@@ -81,7 +84,7 @@ class VkAgent(VkSearch):
             return [user_info, search_flag, search_info, step, False, None]
         else:
             step += 1
-            value = list(search_info.values())[step]
+            value = search_info[step]
             self.send_info_users(value)
             self.send_message("Выберите действие", buttons=['+♥', 'Далее', '♥'])
             if step == len(value) - 1:
@@ -128,22 +131,22 @@ class VkAgent(VkSearch):
             time.sleep(1)
             self.send_message(some_text, button, title)
 
-    def send_top_photos(self, user_id):
+    def send_top_photos(self, merging_user_id):
         """Отправка топ-3 фотографий пользователя"""
         self.send_message("Подождите, получаем топ-3 фото пользователя...")
-        top_photo = self.top_photo(user_id)
-        if not self._users_lock(user_id) and top_photo:
+        top_photo = self.top_photo(merging_user_id)
+        if not self._users_lock(merging_user_id) and top_photo:
             attachment = ''
             for photo in top_photo:
-                attachment += f"photo{user_id}_{photo[0]},"
+                attachment += f"{photo['photo_id']},"
             self.vk_session.method("messages.send", {
-                "user_id": self.user_id,
-                "attachment": attachment[:-1],
-                "random_id": 0})
+                        "user_id": self.user_id,
+                        "attachment": attachment[:-1],
+                        "random_id": 0})
         elif top_photo:
             self.send_message("Извините, но у пользователя закрытый профиль.\n Вы можете посмотреть фото по ссылкам")
             for photo in top_photo:
-                self.send_message(photo[1])
+                self.send_message(photo['photo_url'])
         else:
             self.send_message("Извините, но у пользователя нет доступных фотографий")
 
@@ -169,13 +172,13 @@ class VkAgent(VkSearch):
     def send_info_users(self, value):
         info = f"{value['first_name']} {value['last_name']}\n{value['url']}\n\n"
         self.send_message(info)
-        self.send_top_photos(value['user_id'])
+        self.send_top_photos(value['merging_user_id'])
 
     def get_favorite(self):
         self.send_message("Вывожу избранных пользователей\n\n")
         for user_fav in self.fav.values():
             self.send_info_users(user_fav)
-        self.send_message("-"*50)
+        self.send_message("-" * 50)
         self.send_message("Выберите действие", buttons=['+♥', 'Далее', '♥'])
         return self.result
 

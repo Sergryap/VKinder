@@ -104,17 +104,18 @@ class VkSearch(DBConnect):
                 count_likes = str(likes)
                 # Добавляем словарь в список photos_info
                 photos_info.append({
+                    'photo_id': f"photo{owner_id}_{item['id']}",
+                    'merging_user_id': owner_id,
                     'photo_url': photo_url,
-                    'count_likes': count_likes,
-                    'photo_id': item['id']
+                    'count_likes': count_likes
                 })
             return photos_info
 
+    @db_connect(table="Photo", method="insert")
     def top_photo(self, owner_id):
         """
-        Поиск топ-3 фото пользователя по всем альбомам пользователя
+        Поиск топ-3 фото пользователя по первому доступному альбому
         """
-
         def key_sort(elem):
             return elem['count_likes']
 
@@ -122,10 +123,12 @@ class VkSearch(DBConnect):
         albums = self.__albums_id(owner_id)
         if albums:
             for album_id in albums:
-                total_photos_info += self.__photos_get(owner_id, album_id)
-                photos_sorted = sorted(total_photos_info, key=key_sort, reverse=True)[:3]
-                return [(f['photo_id'], f['photo_url']) for f in photos_sorted]
+                photo_info = self.__photos_get(owner_id, album_id)
+                total_photos_info += photo_info
+                if total_photos_info:
+                    return sorted(total_photos_info, key=key_sort, reverse=True)[:3]
 
+    @db_connect(table="MergingUser", method="insert")
     def users_search(self, users_info):
         """Поиск подходящих пользователей по данным users_info"""
         year_now = dt.datetime.date(dt.datetime.now()).year
@@ -135,7 +138,7 @@ class VkSearch(DBConnect):
         age_from = year_now - year_birth - 1
         age_to = year_now - year_birth + 1
         fields = 'country,sex,city,bdate'
-        users_search = {}
+        users_search = []
         params_delta = {
             'city': city,
             'sex': sex,
@@ -150,15 +153,15 @@ class VkSearch(DBConnect):
         if response and response['response']['items']:
             for item in response['response']['items']:
                 user_id = item['id']
-                users_search[user_id] = {
-                    'user_id': user_id,
+                users_search.append({
+                    'merging_user_id': user_id,
                     'city_id': None if 'city' not in item else item['city']['id'],
                     'sex': item['sex'],
                     'first_name': item['first_name'],
                     'last_name': item['last_name'],
                     'bdate': None if 'bdate' not in item else item['bdate'],
                     'url': rf"https://vk.com/id{user_id}"
-                }
+                })
         return users_search
 
     def _users_lock(self, user_id):
@@ -172,7 +175,7 @@ class VkSearch(DBConnect):
             return response['response'][0]['is_closed']
         return True
 
-    # @db_connect(table="user", method="insert")
+    @db_connect(table="User", method="insert")
     def get_info_users(self):
         """
         Получение данных о пользователе по его id
@@ -207,12 +210,13 @@ class VkSearch(DBConnect):
             birth_year = time.strptime(birth_date, "%d.%m.%Y").tm_year if birth_date else None
         return birth_date, birth_year
 
-    @staticmethod
-    def update_year_birth(user_info: dict, age: int):
+    @db_connect(table="User", method="update")
+    def update_year_birth(self, user_info: dict, age: int):
         """Обновление данных о годе рождения в словаре user_info на основании указанного возраста"""
         year_now = dt.datetime.date(dt.datetime.now()).year
         birth_year = year_now - age
         user_info['year_birth'] = birth_year
+        return birth_year
 
 
 if __name__ == '__main__':
