@@ -137,7 +137,7 @@ class DBConnect:
             SELECT *
             FROM public.merging_user
             WHERE user_id = {self.user_id} 
-            ORDER BY bdate
+            ORDER BY merging_user_id
             OFFSET {self.offset_bd}
             LIMIT 10
             """).fetchall()
@@ -169,7 +169,7 @@ class DBConnect:
             SELECT merging_user_id
             FROM public.merging_user
             WHERE user_id = {self.user_id} 
-            ORDER BY bdate DESC
+            ORDER BY merging_user_id DESC
             LIMIT 1
             """).fetchall()
         if end_merging_user[0][0] == end_sel:
