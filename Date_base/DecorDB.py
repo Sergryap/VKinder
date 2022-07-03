@@ -117,16 +117,65 @@ class DBConnect:
             WHERE user_id = {self.user_id} and favorite = True 
             """).fetchall()
         return [{
-                'merging_user_id': s[0],
-                'city_id': s[2],
-                'sex': s[3],
-                'first_name': s[4],
-                'last_name': s[5],
-                'bdate': s[6],
-                'url': s[7]
-                }
-                for s in sel
-                ]
+            'merging_user_id': s[0],
+            'city_id': s[2],
+            'sex': s[3],
+            'first_name': s[4],
+            'last_name': s[5],
+            'bdate': s[6],
+            'url': s[7]
+            }
+            for s in sel
+            ]
+
+    def get_merging_user_db(self):
+        """
+        Получение информации о подходящих пользователях из merging_user
+        для пользователя self.user_id
+        """
+        sel = self.conn.execute(f"""
+            SELECT *
+            FROM public.merging_user
+            WHERE user_id = {self.user_id} 
+            ORDER BY bdate
+            OFFSET {self.offset_bd}
+            LIMIT 10
+            """).fetchall()
+        self.offset_bd += 10
+        merging_users = [{
+            'merging_user_id': s[0],
+            'city_id': s[2],
+            'sex': s[3],
+            'first_name': s[4],
+            'last_name': s[5],
+            'bdate': s[6],
+            'url': s[7]
+            }
+            for s in sel
+            ]
+        end_users = merging_users[-1]['merging_user_id']
+        len_merging_users = len(merging_users)
+        # обнуляем self.offset_bd, если дошли до последнего merging_users_id
+        self.set_offset_bd(end_users, len_merging_users)
+        return merging_users
+
+    def set_offset_bd(self, end_sel, len_end_offset):
+        """Функция обнуления параметра self.offset_bd"""
+        end_merging_user = self.conn.execute(f"""
+            SELECT merging_user_id
+            FROM public.merging_user
+            WHERE user_id = {self.user_id} 
+            ORDER BY bdate DESC
+            LIMIT 1
+            """).fetchall()
+        if end_merging_user[0][0] == end_sel:
+            # обнуляем self.offset_bd, если дошли до последнего merging_users_id
+            # и назначаем search_offset для продолжения поиска из VK
+            self.search_offset = self.offset_bd - 10 + len_end_offset
+            self.offset_bd = 0
+            # меняем флаг, сигнализирующий о необходимости получать данные из БД
+            self.merging_user_from_bd = False
+
 
     def delete_data_table(self, table: str):
         """Удаление данных из таблицы для пользователя self.user_id"""
@@ -231,4 +280,4 @@ def db_connect(table, method):
 
 if __name__ == '__main__':
     x = DBConnect()
-    pprint(x.get_top_photo_db(242374946))
+    # print(x.set_offset_bd())

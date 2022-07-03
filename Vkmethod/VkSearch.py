@@ -22,6 +22,10 @@ class VkSearch(DBConnect):
         self.params = {'access_token': self.token[0], 'v': '5.131'}
         self.author = 0
         self.search_offset = 0
+        self.offset_bd = 0
+        # Флаг указывающий на необходимость брать данные по merging_user_id из БД,
+        # а не из сервера VK
+        self.merging_user_from_bd = False
 
     def __set_params(self, zero=True):
         """Установка параметров для get запроса при неудачном запросе"""
