@@ -3,12 +3,13 @@ import vk_api
 from vk_api.longpoll import VkLongPoll, VkEventType
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 import time
-from VkSearch import VkSearch
+from Vkmethod.VkSearch import VkSearch
 import os
 from Date_base.DecorDB import db_connect
 
 
 def user_bot():
+    """Основная функция взаимодействия. Точка входа"""
     with open(os.path.join(os.getcwd(), "token.txt"), encoding='utf-8') as file:
         token = [t.strip() for t in file.readlines()]
     vk_session = vk_api.VkApi(token=token[0])
@@ -21,8 +22,11 @@ def user_bot():
                     msg = event.text.lower()
                     user_id = event.user_id
                     if user_id not in users:
+                        # Для каждого пользователя создаем свой класс
                         exec(f"id_{user_id} = VkAgent({user_id})")
                         exec(f"id_{user_id}.msg = '{msg}'")
+                        # Устанавливаем значение self.search_offset из базы данных
+                        # Для уменьшения повторной выдачи тех же пользователей
                         exec(f"id_{user_id}.search_offset = id_{user_id}.user_offset_get()")
                         users.append(user_id)
                     else:
@@ -47,9 +51,9 @@ class VkAgent(VkSearch):
         self.vk_session = vk_api.VkApi(token=self.token_bot)
         self.longpool = VkLongPoll(self.vk_session)
         self.fav = []
-        self.result = [None, None, None, None, None, 1]  # список для хранения временных данных и флагов
+        self.result = [None, None, None, None, None, 1]  # список для хранения временных данных и управляющих флагов
         # self.result[0] - хранит данные о текущем пользователе в чате
-        # self.result[1] - При первом обращении заносится флаг о необходимости запроса возраста при недостатке данных
+        # self.result[1] - при первом обращении заносится флаг о необходимости запроса возраста при недостатке данных
         # При последующих обращения хранит информацию о небходимости формирования временного списка подходящих пользователей
         # self.result[2] - хранит временный список подходящих пользователей
         # self.result[3] - хранит индекс из списка подходящих пользователей к выводу для self.user_id
@@ -57,8 +61,8 @@ class VkAgent(VkSearch):
         # в случае ожидания сообщения от пользователя
         # self.result[5] - хранит флаг, указывающий на необходимость вызова функции обновления данных о возрасте,
         # после его указания пользователем
-        # self.result[6] - Индекс формируется по ходу выполнения и хранит информацию о только
-        # что выведенном пользователе для занесения его в избранные в случае необходимости
+        # self.result[6] - индекс формируется по ходу выполнения и хранит информацию о только что
+        # выведенном пользователе для занесения его в избранные в случае необходимости
 
     def handler_func(self):
         """Функция-обработчик событий сервера типа MESSAGE_NEW"""
@@ -200,7 +204,7 @@ class VkAgent(VkSearch):
         """
         Добавление пользователя в избранные
         """
-        self.fav.append(self.result[6])
+        # self.fav.append(self.result[6])
         send_msg = f"Пользователь {self.result[6]['merging_user_id']}:\n{self.result[6]['first_name']} {self.result[6]['last_name']} добавлен в избранное"
         self.send_message(send_msg)
         self.send_message("Выберите действие", buttons=['+♥', 'Далее', '♥', 'С начала'])
@@ -221,7 +225,7 @@ class VkAgent(VkSearch):
     def restart(self):
         """
         Установка параметров для начала обхода подходящих пользователей
-        с учетом имеющихся данных в БД
+        из имеющихся уже в БД
         """
         search_flag = True
         search_info = None

@@ -6,11 +6,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm.session import sessionmaker
 from Date_base.created_table import User, Ses, OffsetUser, MergingUser, Photo
 from Date_base.password import password
-from pprint import pprint
 
 
 class DBConnect:
     """Класс взаимодействия с базой данных"""
+
     pswrd = urllib.parse.quote_plus(password)
     db = f"postgresql+psycopg2://sergryap:{pswrd}@localhost:5432/vkinder"
     engine = create_engine(db, echo=False)
@@ -35,7 +35,7 @@ class DBConnect:
             self.delete_data_table(table)
 
     def insert_db_table(self, data: dict, table: str):
-        """Вставка одной строик в таблицу"""
+        """Вставка одной строки в таблицу"""
         data['bdate'] = self.date_format(data['bdate'])
         if self.verify_insert_user():
             session = self.Session()
@@ -160,7 +160,11 @@ class DBConnect:
         return merging_users
 
     def set_offset_bd(self, end_sel, len_end_offset):
-        """Функция обнуления параметра self.offset_bd"""
+        """
+        Функция обнуления параметра self.offset_bd
+        при достижении в выводе последнего имеющегося в БД пользователя.
+        Принята сортировка по возрасту
+        """
         end_merging_user = self.conn.execute(f"""
             SELECT merging_user_id
             FROM public.merging_user
@@ -175,7 +179,6 @@ class DBConnect:
             self.offset_bd = 0
             # меняем флаг, сигнализирующий о необходимости получать данные из БД
             self.merging_user_from_bd = False
-
 
     def delete_data_table(self, table: str):
         """Удаление данных из таблицы для пользователя self.user_id"""
@@ -216,7 +219,8 @@ class DBConnect:
     def user_offset_set(self):
         """
         Запись параметра self.search_offset в БД
-        Для использования при повторном подключении пользователя
+        Для использования при повторном подключении пользователя,
+        чтобы не выводить повторно одних и тех же людей
         """
         session = self.Session()
         offset = 5 if self.search_offset == 0 else self.search_offset - 5
@@ -226,7 +230,7 @@ class DBConnect:
 
     def get_info_users_db(self):
         """
-        Получение данных о пользователе из БД
+        Получение данных о пользователе self.user_id из БД
         """
         sel = self.conn.execute(f"""
                     SELECT *
@@ -280,4 +284,3 @@ def db_connect(table, method):
 
 if __name__ == '__main__':
     x = DBConnect()
-    # print(x.set_offset_bd())

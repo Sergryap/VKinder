@@ -8,9 +8,8 @@ from Date_base.DecorDB import db_connect
 
 
 class VkSearch(DBConnect):
-    """
-    Класс методов поиска и сортировки
-    """
+    """Класс методов поиска и сортировки из api-vk"""
+
     url = 'https://api.vk.com/method/'
 
     def __init__(self):
@@ -40,6 +39,7 @@ class VkSearch(DBConnect):
         с другим токеном и установкой этого токена по умолчанию
         через функцию __set_params
         Для работы функции необходим текстовый файл token.txt с построчно записанными токенами
+        В первую строку заносится токен от чат-бота.
         """
         print(f'Глубина рекурсии: {i}/токен: {self.author}')
         method_url = self.url + method
@@ -52,7 +52,7 @@ class VkSearch(DBConnect):
             self.__set_params(zero=False)
         elif self.author == len(self.token) - 1:
             self.__set_params()
-        count = i + 1
+        count = i + 1  # счетчик стэков вызова
         return self.get_stability(method, params_delta, i=count)
 
     def __albums_id(self, owner_id):
@@ -119,6 +119,7 @@ class VkSearch(DBConnect):
     def top_photo(self, owner_id):
         """
         Поиск топ-3 фото пользователя по первому доступному альбому
+        Декоратором данные заносятся в БД в таблицу photo
         """
         def key_sort(elem):
             return elem['count_likes']
@@ -134,7 +135,10 @@ class VkSearch(DBConnect):
 
     @db_connect(table="MergingUser", method="insert")
     def users_search(self, users_info):
-        """Поиск подходящих пользователей по данным users_info"""
+        """
+        Поиск подходящих пользователей по данным users_info
+        Декоратором данные заносятся в таблицу merging_user
+        """
         year_now = dt.datetime.date(dt.datetime.now()).year
         year_birth = users_info['year_birth']
         city = users_info['city_id']
@@ -185,6 +189,7 @@ class VkSearch(DBConnect):
         """
         Получение данных о пользователе по его id
         :return: словарь с данными по пользователю
+        Декоратором данные заносятся в таблицу user
         """
 
         params_delta = {'user_ids': self.user_id, 'fields': 'country,city,bdate,sex'}
@@ -218,7 +223,10 @@ class VkSearch(DBConnect):
 
     @db_connect(table="User", method="update")
     def update_year_birth(self, user_info: dict, age: int):
-        """Обновление данных о годе рождения в словаре user_info на основании указанного возраста"""
+        """
+        Обновление данных о годе рождения в словаре user_info на основании указанного возраста
+        Декоратором данные обновляются в БД
+        """
         year_now = dt.datetime.date(dt.datetime.now()).year
         birth_year = year_now - age
         user_info['year_birth'] = birth_year
@@ -226,5 +234,5 @@ class VkSearch(DBConnect):
 
 
 if __name__ == '__main__':
-    serg = VkSearch()
-    print(serg.top_photo(51166388))
+    test = VkSearch()
+

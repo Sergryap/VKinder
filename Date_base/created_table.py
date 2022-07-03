@@ -56,7 +56,6 @@ class MergingUser(Base):
     photos = relationship('Photo', cascade="all,delete", backref='merging_user')
 
 
-
 class Photo(Base):
     __tablename__ = 'photo'
 
