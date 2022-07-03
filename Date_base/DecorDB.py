@@ -5,14 +5,13 @@ from functools import wraps
 from sqlalchemy import create_engine
 from sqlalchemy.orm.session import sessionmaker
 from Date_base.created_table import User, Ses, OffsetUser, MergingUser, Photo
+from Date_base.password import password
+from pprint import pprint
 
 
-# from Date_base.password import password
-
-
-class DBConnect():
+class DBConnect:
     """Класс взаимодействия с базой данных"""
-    pswrd = urllib.parse.quote_plus('')
+    pswrd = urllib.parse.quote_plus(password)
     db = f"postgresql+psycopg2://sergryap:{pswrd}@localhost:5432/vkinder"
     engine = create_engine(db, echo=False)
     conn = engine.connect()
@@ -28,11 +27,15 @@ class DBConnect():
             elif table == "Photo":
                 self.insert_db_table_photo(data, table)
         if method == "update":
-            self.update_db_year_birth(data)
+            if table == "User":
+                self.update_db_year_birth(data)
+            elif table == "MergingUser":
+                self.add_favorite_db(data[6]["merging_user_id"])
         if method == "delete":
             self.delete_data_table(table)
 
     def insert_db_table(self, data: dict, table: str):
+        """Вставка одной строик в таблицу"""
         data['bdate'] = self.date_format(data['bdate'])
         if self.verify_insert_user():
             session = self.Session()
@@ -41,6 +44,7 @@ class DBConnect():
             session.commit()
 
     def insert_db_table_list(self, data_users: list, table: str):
+        """Вставка нескольких строк в таблицу"""
         session = self.Session()
         for user in data_users:
             user['bdate'] = self.date_format(user['bdate'])
@@ -52,6 +56,7 @@ class DBConnect():
         session.commit()
 
     def insert_db_table_photo(self, top_photo: list, table: str):
+        """Вставка информации о топ-фото для пользователя в отдельную таблицу"""
         session = self.Session()
         for photo in top_photo:
             if self.verify_insert_photo(photo["photo_id"]):
@@ -60,6 +65,8 @@ class DBConnect():
         session.commit()
 
     def verify_insert_user(self):
+        """Проверка вхождения пользователя в таблицу User"""
+
         sel = self.conn.execute(f"""
             SELECT user_id
             FROM public.user
@@ -68,7 +75,7 @@ class DBConnect():
         return not sel
 
     def verify_insert_merging_user(self, merging_user_id):
-        """проверка вхождения пользователя merging_user в БД"""
+        """проверка вхождения пользователя в таблицу MergingUser"""
         sel = self.conn.execute(f"""
             SELECT merging_user_id
             FROM public.merging_user
@@ -77,7 +84,7 @@ class DBConnect():
         return not sel
 
     def verify_insert_photo(self, photo_id):
-        """Проверка вхождения photo_id в БД"""
+        """Проверка вхождения photo_id в таблицу Photo"""
         sel = self.conn.execute(f"""
             SELECT photo_id
             FROM public.photo
@@ -86,11 +93,43 @@ class DBConnect():
         return not sel
 
     def update_db_year_birth(self, new_year):
+        """Обновление года рождения для пользователе self.user_id"""
         session = self.Session()
         session.query(User).filter(User.user_id == self.user_id).update({"year_birth": new_year})
         session.commit()
 
+    def add_favorite_db(self, f_user_id):
+        """
+        Добавление пользователя в избранное
+        установкой значения атрибута favorite равным True в таблице MergingUser
+        """
+        session = self.Session()
+        s = session.query(MergingUser).filter(MergingUser.merging_user_id == f_user_id and MergingUser.user_id == self.user_id)
+        s.update({"favorite": True})
+        session.commit()
+        return self.result
+
+    def get_favorite_db(self):
+        """Получение данных об избранных пользователях для пользователя self.user_id"""
+        sel = self.conn.execute(f"""
+            SELECT *
+            FROM public.merging_user
+            WHERE user_id = {self.user_id} and favorite = True 
+            """).fetchall()
+        return [{
+                'merging_user_id': s[0],
+                'city_id': s[2],
+                'sex': s[3],
+                'first_name': s[4],
+                'last_name': s[5],
+                'bdate': s[6],
+                'url': s[7]
+                }
+                for s in sel
+                ]
+
     def delete_data_table(self, table: str):
+        """Удаление данных из таблицы для пользователя self.user_id"""
         session = self.Session()
         session.query(eval(table)).filter(User.user_id == self.user_id).delete()
         session.commit()
@@ -156,6 +195,24 @@ class DBConnect():
                 'year_birth': sel[6]
             }
 
+    def get_top_photo_db(self, merging_user_id):
+        """
+        Получение списка словарей, содержащих информацию о
+        топ-3 фото пользователя merging_user_id
+        """
+        sel = self.conn.execute(f"""
+                    SELECT *
+                    FROM public.photo                                                
+                    WHERE merging_user_id = {merging_user_id}
+                """).fetchall()
+        return [{
+            'photo_id': s[0],
+            'merging_user_id': s[1],
+            'photo_url': s[2],
+            'count_likes': s[3]
+                }
+                for s in sel]
+
 
 def db_connect(table, method):
     """Декоратор для записи данных в БД"""
@@ -174,4 +231,4 @@ def db_connect(table, method):
 
 if __name__ == '__main__':
     x = DBConnect()
-    print(x.user_offset_set())
+    pprint(x.get_top_photo_db(242374946))

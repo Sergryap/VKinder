@@ -5,6 +5,7 @@ from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 import time
 from VkSearch import VkSearch
 import os
+from Date_base.DecorDB import db_connect
 
 
 def user_bot():
@@ -45,7 +46,7 @@ class VkAgent(VkSearch):
         self.user_id = user_id
         self.vk_session = vk_api.VkApi(token=self.token_bot)
         self.longpool = VkLongPoll(self.vk_session)
-        self.fav = {}
+        self.fav = []
         self.result = [None, None, None, None, None, 1]
 
     def handler_func(self):
@@ -60,6 +61,7 @@ class VkAgent(VkSearch):
             return self.step_other_func()
 
     def step_2_func(self):
+        """Функция-обработчик сообщения от пользователя с указанным возрастом"""
         user_info = self.result[0]
         enter_age = self.result[1]
         if enter_age and self.msg.isdigit():
@@ -73,6 +75,7 @@ class VkAgent(VkSearch):
             return [user_info, True, None, 0, False, 3]
 
     def step_other_func(self):
+        """Функция-обработчик остальных сообщений пользователя"""
         if self.msg == '♥':
             return self.get_favorite()
         if self.msg == '+♥':
@@ -86,11 +89,11 @@ class VkAgent(VkSearch):
             search_flag = False
             return [user_info, search_flag, search_info, step, False, None]
         else:
-            step += 1
             value = search_info[step]
+            step += 1
             self.send_info_users(value)
             self.send_message("Выберите действие", buttons=['+♥', 'Далее', '♥'])
-            if step == len(value) - 1:
+            if step == len(search_info):
                 step = 0
                 search_flag = True
             return [user_info, search_flag, search_info, step, True, None, value]
@@ -111,6 +114,10 @@ class VkAgent(VkSearch):
         return [user_info, enter_age, exit_flag, None, enter_age, 2]
 
     def send_message(self, some_text, button=False, buttons=False, title=''):
+        """
+        Отправка сообщения пользователю.
+        В том числе, с созданием кнопок при необходимости
+        """
         params = {
             "user_id": self.user_id,
             "message": some_text,
@@ -138,7 +145,9 @@ class VkAgent(VkSearch):
     def send_top_photos(self, merging_user_id):
         """Отправка топ-3 фотографий пользователя"""
         self.send_message("Подождите, получаем топ-3 фото пользователя...")
-        top_photo = self.top_photo(merging_user_id)
+        top_photo = self.get_top_photo_db(merging_user_id)
+        if not top_photo:
+            top_photo = self.top_photo(merging_user_id)
         if not self._users_lock(merging_user_id) and top_photo:
             attachment = ''
             for photo in top_photo:
@@ -155,6 +164,9 @@ class VkAgent(VkSearch):
             self.send_message("Извините, но у пользователя нет доступных фотографий")
 
     def messages_var(self):
+        """
+        Обработка сообщений пользователя при первом обращении к боту
+        """
         if self.msg in ['да', 'конечно', 'yes', 'хочу', 'давай', 'буду']:
             self.send_message("Сейчас сделаю")
             return False
@@ -166,25 +178,36 @@ class VkAgent(VkSearch):
             self.send_message("Подобрать варианты для знакомств? Да/Нет", buttons=["Да", "Нет"])
             return 3
 
+    @db_connect(table="MergingUser", method="update")
     def add_favorite(self):
-        self.fav.update({self.result[6]['user_id']: self.result[6]})
-        send_msg = f"Пользователь {self.result[6]['user_id']}:\n{self.result[6]['first_name']} {self.result[6]['last_name']} добавлен в избранное"
+        """
+        Добавление пользователя в избранные
+        """
+        self.fav.append(self.result[6])
+        send_msg = f"Пользователь {self.result[6]['merging_user_id']}:\n{self.result[6]['first_name']} {self.result[6]['last_name']} добавлен в избранное"
         self.send_message(send_msg)
         self.send_message("Выберите действие", buttons=['+♥', 'Далее', '♥'])
         return self.result
 
-    def send_info_users(self, value):
-        info = f"{value['first_name']} {value['last_name']}\n{value['url']}\n\n"
-        self.send_message(info)
-        self.send_top_photos(value['merging_user_id'])
-
     def get_favorite(self):
+        """
+        Вывод информации об избранных пользователях и отправка пользователю
+        """
         self.send_message("Вывожу избранных пользователей\n\n")
-        for user_fav in self.fav.values():
+        favorites = self.get_favorite_db()
+        for user_fav in favorites:
             self.send_info_users(user_fav)
         self.send_message("-" * 50)
         self.send_message("Выберите действие", buttons=['+♥', 'Далее', '♥'])
         return self.result
+
+    def send_info_users(self, value):
+        """
+        Отправка информации о следующем найденном пользователе
+        """
+        info = f"{value['first_name']} {value['last_name']}\n{value['url']}\n\n"
+        self.send_message(info)
+        self.send_top_photos(value['merging_user_id'])
 
 
 if __name__ == '__main__':
