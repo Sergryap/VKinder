@@ -53,6 +53,7 @@ class MergingUser(Base):
     bdate = Column(Date)
     url = Column(String(300))
     favorite = Column(Boolean, default=False)
+    black_list = Column(Boolean, default=False)
     photos = relationship('Photo', cascade="all,delete", backref='merging_user')
 
 
