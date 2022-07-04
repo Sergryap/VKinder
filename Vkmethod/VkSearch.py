@@ -73,6 +73,7 @@ class VkSearch(DBConnect):
         Находим фото с наибольшим разрешением.
         Если данных по размерам нет, то принимаем по size['type']
         по данным словаря item
+        В данной программе метод не используется!!! Из-за не надобности
         """
         area = 0
         for size in item['sizes']:
@@ -103,14 +104,14 @@ class VkSearch(DBConnect):
         if response:
             photos_info = []
             for item in response['response']['items']:
-                photo_url = self.__get_items(item)
+                # photo_url = self.__get_items(item)
                 likes = item['likes']['count']
                 count_likes = str(likes)
                 # Добавляем словарь в список photos_info
                 photos_info.append({
                     'photo_id': f"photo{owner_id}_{item['id']}",
                     'merging_user_id': owner_id,
-                    'photo_url': photo_url,
+                    # 'photo_url': photo_url,
                     'count_likes': count_likes
                 })
             return photos_info
@@ -127,11 +128,15 @@ class VkSearch(DBConnect):
         total_photos_info = []
         albums = self.__albums_id(owner_id)
         if albums:
+            count = 0
             for album_id in albums:
                 photo_info = self.__photos_get(owner_id, album_id)
                 total_photos_info += photo_info
-                if total_photos_info:
+                count += 1
+                if total_photos_info and len(total_photos_info) > 2:
                     return sorted(total_photos_info, key=key_sort, reverse=True)[:3]
+                elif count == len(albums):
+                    return sorted(total_photos_info, key=key_sort, reverse=True)
 
     @db_connect(table="MergingUser", method="insert")
     def users_search(self, users_info):
@@ -162,15 +167,16 @@ class VkSearch(DBConnect):
         if response and response['response']['items']:
             for item in response['response']['items']:
                 user_id = item['id']
-                users_search.append({
-                    'merging_user_id': user_id,
-                    'city_id': None if 'city' not in item else item['city']['id'],
-                    'sex': item['sex'],
-                    'first_name': item['first_name'],
-                    'last_name': item['last_name'],
-                    'bdate': None if 'bdate' not in item else item['bdate'],
-                    'url': rf"https://vk.com/id{user_id}"
-                })
+                if not self._users_lock(user_id):
+                    users_search.append({
+                        'merging_user_id': user_id,
+                        'city_id': None if 'city' not in item else item['city']['id'],
+                        'sex': item['sex'],
+                        'first_name': item['first_name'],
+                        'last_name': item['last_name'],
+                        'bdate': None if 'bdate' not in item else item['bdate'],
+                        'url': rf"https://vk.com/id{user_id}"
+                    })
         return users_search
 
     def _users_lock(self, user_id):
