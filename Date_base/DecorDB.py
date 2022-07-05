@@ -1,11 +1,7 @@
 import time
-import urllib.parse
 from datetime import date
 from functools import wraps
-from sqlalchemy import create_engine
-from sqlalchemy.orm.session import sessionmaker
 from Date_base.created_table import User, Ses, OffsetUser, MergingUser, Photo
-from Date_base.password import password
 from Date_base.methodsDB import DbMethods
 
 
@@ -15,7 +11,7 @@ class DBConnect(DbMethods):
     Декоратор реализует взаимодейстие между результатом функции и базой данных
     """
 
-    def data_base_connector(self, table, method, data):
+    def data_base_connector(self, table, method, data, flag):
         """Основная внутренняя функция декоратора db_connect"""
         if method == "insert" and data:
             if table == "User":
@@ -28,7 +24,7 @@ class DBConnect(DbMethods):
             if table == "User":
                 self.update_db_year_birth(data)
             elif table == "MergingUser":
-                self.add_favorite_db(data[6]["merging_user_id"])
+                self.add_favorite_black(data[6]["merging_user_id"], flag=flag)
         if method == "delete":
             self.delete_data_table(table)
 
@@ -64,7 +60,6 @@ class DBConnect(DbMethods):
 
     def verify_insert_user(self):
         """Проверка вхождения пользователя в таблицу User"""
-
         sel = self.conn.execute(f"""
             SELECT user_id
             FROM public.user
@@ -103,30 +98,30 @@ class DBConnect(DbMethods):
         """
         session = self.Session()
         s = session.query(MergingUser).filter(MergingUser.merging_user_id == f_user_id and MergingUser.user_id == self.user_id)
-        s.update({"favorite": True})
+        s.update({"favorite": True, "black_list": False})
         session.commit()
         return self.result
 
-    def set_offset_bd(self, end_sel, len_end_offset):
+    def add_favorite_black(self, f_user_id, flag="favorite"):
         """
-        Функция обнуления параметра self.offset_bd
-        при достижении в выводе последнего имеющегося в БД пользователя.
-        Принята сортировка по id
+        Добавление пользователя в стоп-лист
+        установкой флага black_list равным True в таблице MergingUser
         """
-        end_merging_user = self.conn.execute(f"""
-            SELECT merging_user_id
-            FROM public.merging_user
-            WHERE user_id = {self.user_id} 
-            ORDER BY merging_user_id DESC
-            LIMIT 1
-            """).fetchall()
-        if end_merging_user[0][0] == end_sel:
-            # обнуляем self.offset_bd, если дошли до последнего merging_users_id
-            # и назначаем search_offset для продолжения поиска из VK
-            self.search_offset = self.offset_bd - 10 + len_end_offset
-            self.offset_bd = 0
-            # меняем флаг, сигнализирующий о необходимости получать данные из БД
-            self.merging_user_from_bd = False
+        session = self.Session()
+        s = session.query(MergingUser).filter(MergingUser.merging_user_id == f_user_id and MergingUser.user_id == self.user_id)
+        if flag == "favorite":
+            s.update({"favorite": True, "black_list": False})
+        elif flag == "black":
+            s.update({"black_list": True, "favorite": False})
+        session.commit()
+        return self.result
+
+    def favorite_clear_db(self):
+        session = self.Session()
+        s = session.query(MergingUser).filter(MergingUser.user_id == self.user_id)
+        s.update({"favorite": False, "black_list": False})
+        session.commit()
+        return self.result
 
     def delete_data_table(self, table: str):
         """Удаление данных из таблицы для пользователя self.user_id"""
@@ -148,14 +143,14 @@ class DBConnect(DbMethods):
                 return date.fromisoformat(f'{year}-{month}-{day}')
 
 
-def db_connect(table, method):
+def db_connect(table, method, flag=None):
     """Декоратор для взаимодействия с базой данных"""
 
     def dbase(old_func):
         @wraps(old_func)
         def new_func(self, *args, **kwargs):
             result = old_func(self, *args, **kwargs)
-            DBConnect.data_base_connector(self, table, method, result)
+            DBConnect.data_base_connector(self, table=table, method=method, data=result, flag=flag)
             return result
 
         return new_func

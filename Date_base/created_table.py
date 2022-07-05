@@ -1,5 +1,5 @@
 import urllib.parse
-from sqlalchemy import Column, ForeignKey, Integer, String, Date, Boolean, Table, MetaData, PrimaryKeyConstraint, schema
+from sqlalchemy import Column, ForeignKey, Integer, String, Date, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy import create_engine

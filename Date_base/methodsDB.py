@@ -1,9 +1,8 @@
-import time
 import urllib.parse
 from datetime import date
 from sqlalchemy import create_engine
 from sqlalchemy.orm.session import sessionmaker
-from Date_base.created_table import User, Ses, OffsetUser
+from Date_base.created_table import User, Ses, OffsetUser, Photo
 from Date_base.password import password
 
 
@@ -69,6 +68,27 @@ class DbMethods:
         self.set_offset_bd(end_users, len_merging_users)
         return merging_users
 
+    def set_offset_bd(self, end_sel, len_end_offset):
+        """
+        Функция обнуления параметра self.offset_bd
+        при достижении в выводе последнего имеющегося в БД пользователя.
+        Принята сортировка по id
+        """
+        end_merging_user = self.conn.execute(f"""
+            SELECT merging_user_id
+            FROM public.merging_user
+            WHERE user_id = {self.user_id} 
+            ORDER BY merging_user_id DESC
+            LIMIT 1
+            """).fetchall()
+        if end_merging_user[0][0] == end_sel:
+            # обнуляем self.offset_bd, если дошли до последнего merging_users_id
+            # и назначаем search_offset для продолжения поиска из VK
+            self.search_offset = self.offset_bd - 10 + len_end_offset
+            self.offset_bd = 0
+            # меняем флаг, сигнализирующий о необходимости получать данные из БД
+            self.merging_user_from_bd = False
+
     def session_set(self):
         """Запись данных о сессии пользователя"""
         session = self.Session()
@@ -97,6 +117,14 @@ class DbMethods:
         offset = 5 if self.search_offset == 0 else self.search_offset - 5
         offset_add = OffsetUser(user_id=self.user_id, offset_user=offset)
         session.add(offset_add)
+        session.commit()
+
+    def user_offset_clear_db(self):
+        """
+        Удаление данных в таблице OffsetUser для пользователя self.user_id
+        """
+        session = self.Session()
+        session.query(OffsetUser).filter(OffsetUser.user_id == self.user_id).delete()
         session.commit()
 
     def get_info_users_db(self):
@@ -136,3 +164,12 @@ class DbMethods:
             'count_likes': s[3]
                 }
                 for s in sel]
+
+    def verify_in_black_list(self, merging_user_id):
+        """Проверка вхождения merging_user_id в стоп-лист"""
+        sel = self.conn.execute(f"""
+            SELECT merging_user_id
+            FROM public.merging_user
+            WHERE user_id = {self.user_id} and merging_user_id = {merging_user_id} and black_list = True
+            """).fetchall()
+        return bool(sel)

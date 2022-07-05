@@ -1,6 +1,5 @@
 import requests
 import vk_api
-from vk_api.longpoll import VkLongPoll, VkEventType
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 import time
 from Vkmethod.VkSearch import VkSearch
@@ -8,45 +7,9 @@ import os
 from Date_base.DecorDB import db_connect
 
 
-def user_bot():
-	"""Основная функция взаимодействия. Точка входа"""
-	with open(os.path.join(os.getcwd(), "token.txt"), encoding='utf-8') as file:
-		token = [t.strip() for t in file.readlines()]
-	vk_session = vk_api.VkApi(token=token[0])
-	try:
-		longpool = VkLongPoll(vk_session)
-		users = []
-		for event in longpool.listen():
-			if event.type == VkEventType.MESSAGE_NEW:
-				if event.to_me:
-					msg = event.text.lower()
-					user_id = event.user_id
-					if user_id not in users:
-						# Для каждого пользователя создаем свой класс
-						exec(f"id_{user_id} = VkAgent({user_id})")
-						exec(f"id_{user_id}.msg = '{msg}'")
-						# Устанавливаем значение self.search_offset из базы данных
-						# Для уменьшения повторной выдачи тех же пользователей
-						exec(f"id_{user_id}.search_offset = id_{user_id}.user_offset_get()")
-						users.append(user_id)
-					else:
-						exec(f"id_{user_id}.msg = '{msg}'")
-					while True:
-						exec(f"id_{user_id}.result = id_{user_id}.handler_func()")
-						x = compile(f"id_{user_id}.result[4]", "test", "eval")
-						if eval(x):
-							break
-			if event.type == VkEventType.USER_OFFLINE:
-				user_id = event.user_id
-				exec(f"id_{user_id}.session_set()")
-	except requests.exceptions.ReadTimeout:
-		user_bot()
-
-
 class VkAgent(VkSearch):
 	"""
-	В основной функции handler_func() класса VkAgent используется параметр result[0].
-	Этот параметр пораждается самой же функцией и он же ей принимается в качестве параметра при следующем цикле.
+	В основной функции handler_func() класса VkAgent используется параметр result.
 	Данными содержащимимся в этом параметре происходит управление логикой взаимодействия бота с пользователем.
 	Кроме того, он служит для временного хранения промежуточных данных и передаче их между шагами цикла.
 	result[0] - хранит данные о текущем пользователе в чате
@@ -66,8 +29,6 @@ class VkAgent(VkSearch):
 		super().__init__()
 		self.user_id = user_id
 		self.vk_session = vk_api.VkApi(token=self.token_bot)
-		self.longpool = VkLongPoll(self.vk_session)
-		self.fav = []
 		self.result = [None, None, None, None, None, 1]
 
 	def handler_func(self):
@@ -82,7 +43,7 @@ class VkAgent(VkSearch):
 			return self.step_other_func()
 
 	def step_2_func(self):
-		"""Функция-обработчик сообщения от пользователя с указанным возрастом"""
+		"""Функция-обработчик сообщения от пользователя после ввода возраста"""
 		user_info = self.result[0]
 		enter_age = self.result[1]
 		if enter_age and self.msg.isdigit():
@@ -102,8 +63,12 @@ class VkAgent(VkSearch):
 			return self.get_favorite()
 		if self.msg == '+♥':
 			return self.add_favorite()
+		if self.msg == '✘ в стоп-лист':
+			return self.add_black_list()
 		if self.msg == 'с начала':
 			return self.restart()
+		if self.msg == 'очистить избранное':
+			return self.favorite_clear()
 		user_info = self.result[0]
 		search_flag = self.result[1]
 		search_info = self.result[2]
@@ -119,7 +84,7 @@ class VkAgent(VkSearch):
 			value = search_info[step]
 			step += 1
 			self.send_info_users(value)
-			self.send_message("Выберите действие", buttons=['+♥', '>>>', '♥', 'С начала', '✘'])
+			self.send_message("Выберите действие", buttons=self.number_buttons(2))
 			if step == len(search_info):
 				step = 0
 				search_flag = True
@@ -135,7 +100,7 @@ class VkAgent(VkSearch):
 		user_info = self.get_info_users_db()
 		user_info = self.get_info_users() if not user_info else user_info
 		exit_flag = self.messages_var()
-		if not user_info['year_birth'] and not exit_flag:  # После создания БД, проверку сделать по запросу из БД
+		if not user_info['year_birth'] and not exit_flag:
 			self.send_message("Укажите ваш возраст")
 			enter_age = True
 		return [user_info, enter_age, exit_flag, None, enter_age, 2]
@@ -164,16 +129,42 @@ class VkAgent(VkSearch):
 			keyboard.add_button(title, VkKeyboardColor.PRIMARY)
 			params['keyboard'] = keyboard.get_keyboard()
 		if buttons:
-			if len(buttons) == 2:
-				keyboard = VkKeyboard(one_time=True)
+			if buttons[0] == 1:
+				keyboard_1 = VkKeyboard(one_time=True)
 				buttons_color = [VkKeyboardColor.SECONDARY, VkKeyboardColor.NEGATIVE]
-			if len(buttons) == 5:
-				keyboard = VkKeyboard(inline=False)
-				buttons_color = [VkKeyboardColor.SECONDARY, VkKeyboardColor.PRIMARY, VkKeyboardColor.SECONDARY,
-				                 VkKeyboardColor.POSITIVE, VkKeyboardColor.NEGATIVE]
-			for btn, btn_color in zip(buttons, buttons_color):
-				keyboard.add_button(btn, btn_color)
-			params['keyboard'] = keyboard.get_keyboard()
+				for btn, btn_color in zip(buttons[1], buttons_color):
+					keyboard_1.add_button(btn, btn_color)
+				params['keyboard'] = keyboard_1.get_keyboard()
+
+			if buttons[0] == 2:
+				keyboard_2 = VkKeyboard(inline=False)
+				buttons_color = [
+					VkKeyboardColor.SECONDARY,
+					VkKeyboardColor.PRIMARY,
+					VkKeyboardColor.SECONDARY,
+					VkKeyboardColor.POSITIVE,
+					VkKeyboardColor.NEGATIVE
+				]
+				for btn, btn_color in zip(buttons[1][:3], buttons_color[:3]):
+					keyboard_2.add_button(btn, btn_color)
+				keyboard_2.add_line()
+				for btn, btn_color in zip(buttons[1][3:], buttons_color[3:]):
+					keyboard_2.add_button(btn, btn_color)
+				params['keyboard'] = keyboard_2.get_keyboard()
+
+			if buttons[0] == 3:
+				keyboard_3 = VkKeyboard(one_time=False, inline=True)
+				keyboard_3.add_button(buttons[1], VkKeyboardColor.SECONDARY)
+				params['keyboard'] = keyboard_3.get_keyboard()
+
+	@staticmethod
+	def number_buttons(n=1):
+		if n == 1:
+			return 1, ["Да", "Нет"]
+		if n == 2:
+			return 2, ['+♥', '>>>', '♥', 'С начала', '✘ в стоп-лист']
+		if n == 3:
+			return 3, 'Очистить избранное'
 
 	def send_top_photos(self, merging_user_id):
 		"""Отправка топ-3 фотографий пользователя"""
@@ -204,14 +195,15 @@ class VkAgent(VkSearch):
 			self.send_message("Сейчас сделаю")
 			return False
 		if self.msg in ['нет', 'не надо', 'не хочу', 'потом']:
-			self.send_message("Очень жаль. Ждем в следующий раз.\n Вы все еще можете передумать: Да/Нет",
-				buttons=["Да", "Нет"])
+			self.send_message(
+				"Очень жаль. Ждем в следующий раз.\n Вы все еще можете передумать: Да/Нет",
+				buttons=self.number_buttons())
 			return 2
 		else:
-			self.send_message("Подобрать варианты для знакомств? Да/Нет", buttons=["Да", "Нет"])
+			self.send_message("Подобрать варианты для знакомств? Да/Нет", buttons=self.number_buttons())
 			return 3
 
-	@db_connect(table="MergingUser", method="update")
+	@db_connect(table="MergingUser", method="update", flag="favorite")
 	def add_favorite(self):
 		"""
 		Добавление пользователя в избранные
@@ -219,7 +211,17 @@ class VkAgent(VkSearch):
 		# self.fav.append(self.result[6])
 		send_msg = f"Пользователь {self.result[6]['merging_user_id']}:\n{self.result[6]['first_name']} {self.result[6]['last_name']} добавлен в избранное"
 		self.send_message(send_msg)
-		self.send_message("Выберите действие", buttons=['+♥', '>>>', '♥', 'С начала', '✘'])
+		self.send_message("Выберите действие", buttons=self.number_buttons(2))
+		return self.result
+
+	@db_connect(table="MergingUser", method="update", flag="black")
+	def add_black_list(self):
+		"""
+		Добавление пользователя в black_list
+		"""
+		send_msg = f"Пользователь {self.result[6]['merging_user_id']}:\n{self.result[6]['first_name']} {self.result[6]['last_name']} добавлен в стоп-лист"
+		self.send_message(send_msg)
+		self.send_message("Выберите действие", buttons=self.number_buttons(2))
 		return self.result
 
 	def get_favorite(self):
@@ -228,12 +230,18 @@ class VkAgent(VkSearch):
 		"""
 		self.send_message("Избранные пользователи:\n")
 		favorites = self.get_favorite_db()
-		info_send = f'{"♥" * 20}\n'
+		info_send = f'{"♥" * 10}\n'
 		for user_fav in favorites:
 			info_send += f"{user_fav['first_name']} {user_fav['last_name']} {user_fav['url']}\n"
-		info_send += f'{"♥" * 20}\n'
+		info_send += f'{"♥" * 10}\n'
 		self.send_message(info_send)
-		self.send_message("Выберите действие", buttons=['+♥', '>>>', '♥', 'С начала', '✘'])
+		self.send_message("Выберите действие:", buttons=self.number_buttons(3))
+		return self.result
+
+	def favorite_clear(self):
+		self.favorite_clear_db()
+		self.send_message("Список избранных очищен.")
+		self.send_message("Выберите действие", buttons=self.number_buttons(2))
 		return self.result
 
 	def restart(self):
@@ -246,7 +254,7 @@ class VkAgent(VkSearch):
 		step = 0
 		user_info = self.result[0]
 		self.merging_user_from_bd = True
-		self.send_message("Выберите действие", buttons=['+♥', '>>>', '♥', 'С начала', '✘'])
+		self.send_message("Выберите действие", buttons=self.number_buttons(2))
 		return [user_info, search_flag, search_info, step, True, None]
 
 	def send_info_users(self, value):

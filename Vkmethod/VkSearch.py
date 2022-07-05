@@ -11,13 +11,13 @@ class VkSearch(DBConnect):
     """Класс методов поиска и сортировки из api-vk"""
 
     url = 'https://api.vk.com/method/'
+    with open(os.path.join("Vkmethod", "token.txt"), encoding='utf-8') as file:
+        token = [t.strip() for t in file.readlines()]
+    token_bot = token[0]
+    token = token[1:]
 
     def __init__(self):
         super().__init__()
-        with open(os.path.join(os.getcwd(), "token.txt"), encoding='utf-8') as file:
-            token = [t.strip() for t in file.readlines()]
-        self.token_bot = token[0]
-        self.token = token[1:]
         self.params = {'access_token': self.token[0], 'v': '5.131'}
         self.author = 0
         self.search_offset = 0
@@ -67,33 +67,6 @@ class VkSearch(DBConnect):
                 albums_id.append(item['id'])
             return albums_id
 
-    @staticmethod
-    def __get_items(item: dict):
-        """
-        Находим фото с наибольшим разрешением.
-        Если данных по размерам нет, то принимаем по size['type']
-        по данным словаря item
-        В данной программе метод не используется!!! Из-за не надобности
-        """
-        area = 0
-        for size in item['sizes']:
-            if size['height'] and size['width'] and size['height'] > 0 and size['width'] > 0:
-                if size['height'] * size['width'] > area:
-                    area = size['height'] * size['width']
-                    photo_url = size['url']
-            else:
-                flag = False
-                for i in 'wzyx':
-                    for size1 in item['sizes']:
-                        if size1['type'] == i:
-                            photo_url = size1['url']
-                            flag = True
-                            break
-                    if flag:
-                        break
-                break
-        return photo_url
-
     def __photos_get(self, owner_id, album_id):
         """
         Получение данных по фотографиям из одного альбома (album_id) пользователя (owner_id)
@@ -104,7 +77,6 @@ class VkSearch(DBConnect):
         if response:
             photos_info = []
             for item in response['response']['items']:
-                # photo_url = self.__get_items(item)
                 likes = item['likes']['count']
                 count_likes = str(likes)
                 # Добавляем словарь в список photos_info
@@ -162,12 +134,12 @@ class VkSearch(DBConnect):
             'offset': self.search_offset
         }
         response = self.get_stability('users.search', params_delta)
-        self.user_offset_set()
+        self.user_offset_set()  # записываем параметр self.search_offset в БД
         self.search_offset += 10
         if response and response['response']['items']:
             for item in response['response']['items']:
                 user_id = item['id']
-                if not self._users_lock(user_id):
+                if not self._users_lock(user_id) and not self.verify_in_black_list(user_id):
                     users_search.append({
                         'merging_user_id': user_id,
                         'city_id': None if 'city' not in item else item['city']['id'],
@@ -177,6 +149,15 @@ class VkSearch(DBConnect):
                         'bdate': None if 'bdate' not in item else item['bdate'],
                         'url': rf"https://vk.com/id{user_id}"
                     })
+        # если достигнута максимально допустимая выдача, то список будет пустой.
+        # Это ограничение выдачи первых 1000 пользоватлей.
+        # Чтобы обойти это, можно находить пользователей через другие методы, например сначала находить группы, а
+        # а из них уже пользователей. Данный функционал пока не реализован. Для этого можно создать отдельные функции.
+        # Поэтому пока обнуляем парметр self.search_offset, в т.ч. и в БД, чтобы не было ошибки.
+        if not users_search:
+            self.user_offset_clear_db()
+            self.search_offset = 0
+            return self.users_search(users_info)
         return users_search
 
     def _users_lock(self, user_id):
@@ -241,4 +222,3 @@ class VkSearch(DBConnect):
 
 if __name__ == '__main__':
     test = VkSearch()
-
