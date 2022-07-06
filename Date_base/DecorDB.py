@@ -29,25 +29,44 @@ class DBConnect(DbMethods):
             self.delete_data_table(table)
 
     def insert_db_table(self, data: dict, table: str):
-        """Вставка одной строки в таблицу"""
-        data['bdate'] = self.date_format(data['bdate'])
+        """Вставка одной строки в таблицу User"""
         if self.verify_insert_user():
+            data['bdate'] = self.date_format(data['bdate'])
             session = self.Session()
             user_add = eval(table)(**data)
             session.add(user_add)
+            merging_user_add = MergingUser(merging_user_id=1)
+            session.add(merging_user_add)
             session.commit()
+            # self.conn.execute(f"""
+            #     INSERT INTO public.user_merginguser (user_id, merging_user_id)
+            #     VALUES ({self.user_id}, 1)
+            #     """)
 
     def insert_db_table_list(self, data_users: list, table: str):
-        """Вставка нескольких строк в таблицу"""
-        session = self.Session()
+        """Вставка нескольких строк в таблицу MergingUser"""
+        values_1 = ''
+        values_2 = ''
         for user in data_users:
-            user['bdate'] = self.date_format(user['bdate'])
-            user['user_id'] = self.user_id
             merging_user_id = user['merging_user_id']
+            user['bdate'] = self.date_format(user['bdate'])
             if self.verify_insert_merging_user(merging_user_id):
-                user_add = eval(table)(**user)
-                session.add(user_add)
-        session.commit()
+                if not user['city_id']:
+                    user['city_id'] = 0
+                values_1 += f"""
+                    ({merging_user_id}, {user['city_id']}, {user['sex']},
+                     '{user['first_name']}', '{user['last_name']}', '{user['bdate']}', '{user['url']}'),\n"""
+                values_2 += f"({self.user_id}, {merging_user_id}),\n"
+
+        if values_2:
+            self.conn.execute(f"""
+                INSERT INTO public.merging_user
+                VALUES {values_1[:-2]}         
+                """)
+            self.conn.execute(f"""
+            INSERT INTO public.user_merginguser (user_id, merging_user_id)
+            VALUES {values_2[:-2]}                   
+            """)
 
     def insert_db_table_photo(self, top_photo: list, table: str):
         """Вставка информации о топ-фото для пользователя в отдельную таблицу"""
@@ -91,37 +110,31 @@ class DBConnect(DbMethods):
         session.query(User).filter(User.user_id == self.user_id).update({"year_birth": new_year})
         session.commit()
 
-    def add_favorite_db(self, f_user_id):
-        """
-        Добавление пользователя в избранное
-        установкой флага favorite равным True в таблице MergingUser
-        """
-        session = self.Session()
-        s = session.query(MergingUser).filter(MergingUser.merging_user_id == f_user_id and MergingUser.user_id == self.user_id)
-        s.update({"favorite": True, "black_list": False})
-        session.commit()
-        return self.result
-
     def add_favorite_black(self, f_user_id, flag="favorite"):
         """
-        Добавление пользователя в стоп-лист
-        установкой флага black_list равным True в таблице MergingUser
+        Добавление пользователя в стоп-лист либо в избранное
+        установкой флага black_list равным True
+        или favorite равным True в таблице user_merginguser
         """
-        session = self.Session()
-        s = session.query(MergingUser).filter(MergingUser.merging_user_id == f_user_id and MergingUser.user_id == self.user_id)
         if flag == "favorite":
-            s.update({"favorite": True, "black_list": False})
+            f1, f2 = True, False
         elif flag == "black":
-            s.update({"black_list": True, "favorite": False})
-        session.commit()
+            f1, f2 = False, True
+
+        self.conn.execute(f"""
+        UPDATE public.user_merginguser
+        SET favorite = {f1}, black_list = {f2}
+        WHERE merging_user_id = {f_user_id} and user_id = {self.user_id}    
+        """)
         return self.result
 
     def favorite_clear_db(self):
-        session = self.Session()
-        s = session.query(MergingUser).filter(MergingUser.user_id == self.user_id)
-        s.update({"favorite": False, "black_list": False})
-        session.commit()
-        return self.result
+        """Очистка списка избранных и стоп-листа для пользователя self.user_id"""
+        self.conn.execute(f"""
+        UPDATE public.user_merginguser
+        SET favorite = False, black_list = False
+        WHERE user_id = {self.user_id}    
+        """)
 
     def delete_data_table(self, table: str):
         """Удаление данных из таблицы для пользователя self.user_id"""

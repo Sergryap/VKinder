@@ -21,18 +21,23 @@ class DbMethods:
     def get_favorite_db(self):
         """Получение данных об избранных пользователях для пользователя self.user_id"""
         sel = self.conn.execute(f"""
-            SELECT *
-            FROM public.merging_user
+            SELECT
+                merging_user.merging_user_id, merging_user.city_id,
+                merging_user.sex, merging_user.first_name,
+                merging_user.last_name, merging_user.bdate, merging_user.url
+            FROM public.user
+                JOIN public.user_merginguser USING (user_id)
+                JOIN public.merging_user USING (merging_user_id)
             WHERE user_id = {self.user_id} and favorite = True 
             """).fetchall()
         return [{
             'merging_user_id': s[0],
-            'city_id': s[2],
-            'sex': s[3],
-            'first_name': s[4],
-            'last_name': s[5],
-            'bdate': s[6],
-            'url': s[7]
+            'city_id': s[1],
+            'sex': s[2],
+            'first_name': s[3],
+            'last_name': s[4],
+            'bdate': s[5],
+            'url': s[6]
             }
             for s in sel
             ]
@@ -43,22 +48,37 @@ class DbMethods:
         для пользователя self.user_id
         """
         sel = self.conn.execute(f"""
-            SELECT *
-            FROM public.merging_user
-            WHERE user_id = {self.user_id} 
+            SELECT 
+                merging_user.merging_user_id, merging_user.city_id,
+                merging_user.sex, merging_user.first_name,
+                merging_user.last_name, merging_user.bdate, merging_user.url
+            FROM public.user
+                JOIN public.user_merginguser USING (user_id)
+                JOIN public.merging_user USING (merging_user_id)
+            WHERE user_id = {self.user_id}
             ORDER BY merging_user_id
             OFFSET {self.offset_bd}
             LIMIT 10
             """).fetchall()
+
+        # sel = self.conn.execute(f"""
+        #     SELECT *
+        #     FROM public.merging_user
+        #     WHERE user_id = {self.user_id}
+        #     ORDER BY merging_user_id
+        #     OFFSET {self.offset_bd}
+        #     LIMIT 10
+        #     """).fetchall()
+
         self.offset_bd += 10
         merging_users = [{
             'merging_user_id': s[0],
-            'city_id': s[2],
-            'sex': s[3],
-            'first_name': s[4],
-            'last_name': s[5],
-            'bdate': s[6],
-            'url': s[7]
+            'city_id': s[1],
+            'sex': s[2],
+            'first_name': s[3],
+            'last_name': s[4],
+            'bdate': s[5],
+            'url': s[6]
             }
             for s in sel
             ]
@@ -71,16 +91,29 @@ class DbMethods:
     def set_offset_bd(self, end_sel, len_end_offset):
         """
         Функция обнуления параметра self.offset_bd
-        при достижении в выводе последнего имеющегося в БД пользователя.
+        при достижении в выводе последнего имеющегося в БД пользователя для self.user_id.
         Принята сортировка по id
         """
+
         end_merging_user = self.conn.execute(f"""
-            SELECT merging_user_id
-            FROM public.merging_user
-            WHERE user_id = {self.user_id} 
-            ORDER BY merging_user_id DESC
+            SELECT 
+                merging_user.merging_user_id
+            FROM public.user
+                JOIN public.user_merginguser USING (user_id)
+                JOIN public.merging_user USING (merging_user_id)
+            WHERE user_id = {self.user_id}
+            ORDER BY merging_user_id DESC                    
             LIMIT 1
             """).fetchall()
+
+        # end_merging_user = self.conn.execute(f"""
+        #     SELECT merging_user_id
+        #     FROM public.merging_user
+        #     WHERE user_id = {self.user_id}
+        #     ORDER BY merging_user_id DESC
+        #     LIMIT 1
+        #     """).fetchall()
+
         if end_merging_user[0][0] == end_sel:
             # обнуляем self.offset_bd, если дошли до последнего merging_users_id
             # и назначаем search_offset для продолжения поиска из VK
@@ -170,6 +203,16 @@ class DbMethods:
         sel = self.conn.execute(f"""
             SELECT merging_user_id
             FROM public.merging_user
-            WHERE user_id = {self.user_id} and merging_user_id = {merging_user_id} and black_list = True
+                JOIN public.user_merginguser USING (merging_user_id)
+            WHERE user_merginguser.user_id = {self.user_id}
+                and merging_user.merging_user_id = {merging_user_id}
+                and black_list = True
             """).fetchall()
+
+        # sel = self.conn.execute(f"""
+        #     SELECT merging_user_id
+        #     FROM public.merging_user
+        #     WHERE user_id = {self.user_id} and merging_user_id = {merging_user_id} and black_list = True
+        #     """).fetchall()
+
         return bool(sel)
