@@ -35,37 +35,30 @@ class DBConnect(DbMethods):
             session = self.Session()
             user_add = eval(table)(**data)
             session.add(user_add)
-            merging_user_add = MergingUser(merging_user_id=1)
-            session.add(merging_user_add)
             session.commit()
-            # self.conn.execute(f"""
-            #     INSERT INTO public.user_merginguser (user_id, merging_user_id)
-            #     VALUES ({self.user_id}, 1)
-            #     """)
 
     def insert_db_table_list(self, data_users: list, table: str):
         """Вставка нескольких строк в таблицу MergingUser"""
         values_1 = ''
         values_2 = ''
+
         for user in data_users:
             merging_user_id = user['merging_user_id']
             user['bdate'] = self.date_format(user['bdate'])
             if self.verify_insert_merging_user(merging_user_id):
-                if not user['city_id']:
-                    user['city_id'] = 0
+                user['city_id'] = 0 if not user['city_id'] else user['city_id']
                 values_1 += f"""
                     ({merging_user_id}, {user['city_id']}, {user['sex']},
                      '{user['first_name']}', '{user['last_name']}', '{user['bdate']}', '{user['url']}'),\n"""
-                values_2 += f"({self.user_id}, {merging_user_id}),\n"
+                values_2 += f"({self.user_id}, {merging_user_id}, False, False),\n"
 
         if values_2:
             self.conn.execute(f"""
                 INSERT INTO public.merging_user
-                VALUES {values_1[:-2]}         
-                """)
+                VALUES {values_1[:-2]}""")
             self.conn.execute(f"""
-            INSERT INTO public.user_merginguser (user_id, merging_user_id)
-            VALUES {values_2[:-2]}                   
+            INSERT INTO public.user_merginguser
+            VALUES {values_2[:-2]}
             """)
 
     def insert_db_table_photo(self, top_photo: list, table: str):

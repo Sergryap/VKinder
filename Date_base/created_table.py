@@ -34,7 +34,7 @@ class MergingUser(Base):
     last_name = Column(String(100), nullable=False)
     bdate = Column(Date)
     url = Column(String(300))
-    users = relationship('User', secondary='user_merginguser', cascade="all,delete")
+    # users = relationship('User', secondary='user_merginguser', cascade="all,delete")
     photos = relationship('Photo', cascade="all,delete", backref='merging_user')
 
 

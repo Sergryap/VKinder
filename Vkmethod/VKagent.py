@@ -251,11 +251,12 @@ class VkAgent(VkSearch):
 		"""
 		search_flag = True
 		search_info = None
+		value = self.result[6]
 		step = 0
 		user_info = self.result[0]
 		self.merging_user_from_bd = True
 		self.send_message("Выберите действие", buttons=self.number_buttons(2))
-		return [user_info, search_flag, search_info, step, True, None]
+		return [user_info, search_flag, search_info, step, True, None, value]
 
 	def send_info_users(self, value):
 		"""

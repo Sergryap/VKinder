@@ -61,15 +61,6 @@ class DbMethods:
             LIMIT 10
             """).fetchall()
 
-        # sel = self.conn.execute(f"""
-        #     SELECT *
-        #     FROM public.merging_user
-        #     WHERE user_id = {self.user_id}
-        #     ORDER BY merging_user_id
-        #     OFFSET {self.offset_bd}
-        #     LIMIT 10
-        #     """).fetchall()
-
         self.offset_bd += 10
         merging_users = [{
             'merging_user_id': s[0],
