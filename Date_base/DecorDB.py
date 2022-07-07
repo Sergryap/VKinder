@@ -135,8 +135,7 @@ class DBConnect(DbMethods):
         session.query(eval(table)).filter(User.user_id == self.user_id).delete()
         session.commit()
 
-    @staticmethod
-    def date_format(birth_date: str):
+    def date_format(self, birth_date: str):
         """Запись даты в формате fromisoformat"""
         if birth_date:
             if len(birth_date.split(".")) == 3:
@@ -147,6 +146,8 @@ class DBConnect(DbMethods):
                 month = month if month > 9 else str(f"0{month}")
                 day = day if day > 9 else str(f"0{day}")
                 return date.fromisoformat(f'{year}-{month}-{day}')
+            return f"{self.result[0]['year_birth']}-01-01"
+        return f"{self.result[0]['year_birth']}-01-01"
 
 
 def db_connect(table, method, flag=None):

@@ -74,6 +74,7 @@ class VkAgent(VkSearch):
 		search_info = self.result[2]
 		step = self.result[3]
 		if search_flag:
+			self.send_message("Немного подождите. Получаем данные...")
 			if not self.merging_user_from_bd:
 				search_info = self.users_search(user_info)
 			else:

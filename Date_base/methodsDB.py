@@ -97,14 +97,6 @@ class DbMethods:
             LIMIT 1
             """).fetchall()
 
-        # end_merging_user = self.conn.execute(f"""
-        #     SELECT merging_user_id
-        #     FROM public.merging_user
-        #     WHERE user_id = {self.user_id}
-        #     ORDER BY merging_user_id DESC
-        #     LIMIT 1
-        #     """).fetchall()
-
         if end_merging_user[0][0] == end_sel:
             # обнуляем self.offset_bd, если дошли до последнего merging_users_id
             # и назначаем search_offset для продолжения поиска из VK
