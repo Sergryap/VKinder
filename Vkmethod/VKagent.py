@@ -15,6 +15,7 @@ class VkAgent(VkSearch):
 	def __init__(self, user_id):
 		super().__init__()
 		self.user_id = user_id
+		self.msg = ''
 		self.vk_session = vk_api.VkApi(token=self.token_bot)
 		self.search_flag = True  # флаг, указывающий на необходимость формирования временного списка к выдаче
 		self.search_info = []  # хранит временный список подходящих пользователей к выдаче
@@ -48,19 +49,16 @@ class VkAgent(VkSearch):
 			self.update_year_birth(age)
 			self.step_handler_func = 3
 			self.waiting_message = False
-			return None
 
 		elif self.enter_age and not self.msg.isdigit():
 			self.send_message("Введите верный возраст")
 			# Если возраст введен не верно уходим на второй круг и т.д.
 			self.step_handler_func = 2
 			self.waiting_message = True
-			return None
 
 		else:
 			self.step_handler_func = 3
 			self.waiting_message = False
-			return None
 
 	def step_other_func(self):
 		"""Функция-обработчик остальных сообщений пользователя"""
@@ -71,7 +69,7 @@ class VkAgent(VkSearch):
 		if self.msg == '✘ в стоп-лист':
 			return self.add_black_list()
 		if self.msg == 'с начала':
-			return self.restart()
+			self.restart()
 		if self.msg == 'очистить избранное':
 			return self.favorite_clear()
 		if self.search_flag:
@@ -82,7 +80,6 @@ class VkAgent(VkSearch):
 				self.search_info = self.get_merging_user_db()
 			self.search_flag = False
 			self.waiting_message = False
-			return None
 
 		else:
 			self.current_user = self.search_info[self.step]
@@ -93,7 +90,6 @@ class VkAgent(VkSearch):
 			if self.step == len(self.search_info):
 				self.step = 0
 				self.search_flag = True
-			return None
 
 	def get_data_user(self):
 		"""
@@ -108,7 +104,6 @@ class VkAgent(VkSearch):
 			self.enter_age = True
 		self.step_handler_func = 2
 		self.waiting_message = self.enter_age
-		return None
 
 	def send_message(self, some_text, button=False, buttons=False, title=''):
 		"""
@@ -216,7 +211,6 @@ class VkAgent(VkSearch):
 		send_msg = f"Пользователь {self.current_user['merging_user_id']}:\n{self.current_user['first_name']} {self.current_user['last_name']} добавлен в избранное"
 		self.send_message(send_msg)
 		self.send_message("Выберите действие", buttons=self.number_buttons(2))
-		return None
 
 	@db_connect(table="MergingUser", method="update", flag="black")
 	def add_black_list(self):
@@ -226,7 +220,6 @@ class VkAgent(VkSearch):
 		send_msg = f"Пользователь {self.current_user['merging_user_id']}:\n{self.current_user['first_name']} {self.current_user['last_name']} добавлен в стоп-лист"
 		self.send_message(send_msg)
 		self.send_message("Выберите действие", buttons=self.number_buttons(2))
-		return None
 
 	def get_favorite(self):
 		"""
@@ -240,13 +233,11 @@ class VkAgent(VkSearch):
 		info_send += f'{"♥" * 10}\n'
 		self.send_message(info_send)
 		self.send_message("Выберите действие:", buttons=self.number_buttons(3))
-		return None
 
 	def favorite_clear(self):
 		self.favorite_clear_db()
 		self.send_message("Список избранных очищен.")
 		self.send_message("Выберите действие", buttons=self.number_buttons(2))
-		return None
 
 	def restart(self):
 		"""
@@ -257,9 +248,9 @@ class VkAgent(VkSearch):
 		self.search_info = None
 		self.step = 0
 		self.merging_user_from_bd = True
-		self.send_message("Выберите действие", buttons=self.number_buttons(2))
-		self.waiting_message = True
-		return None
+		send_msg = "Начинаем повторную выдачу ранее найденных пользователей"
+		self.send_message(send_msg)
+		self.msg = ''
 
 	def send_info_users(self):
 		"""
