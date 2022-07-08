@@ -119,7 +119,7 @@ class DBConnect(DbMethods):
         SET favorite = {f1}, black_list = {f2}
         WHERE merging_user_id = {f_user_id} and user_id = {self.user_id}    
         """)
-        return self.result
+        return None
 
     def favorite_clear_db(self):
         """Очистка списка избранных и стоп-листа для пользователя self.user_id"""

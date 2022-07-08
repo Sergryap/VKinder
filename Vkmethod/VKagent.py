@@ -16,7 +16,6 @@ class VkAgent(VkSearch):
 		super().__init__()
 		self.user_id = user_id
 		self.vk_session = vk_api.VkApi(token=self.token_bot)
-		self.result = [None, None, None, None, None, 1]
 		self.search_flag = True  # флаг, указывающий на необходимость формирования временного списка к выдаче
 		self.search_info = []  # хранит временный список подходящих пользователей к выдаче
 		self.step = 0  # хранит индекс из списка подходящих пользователей к выводу из self.search_info
@@ -57,7 +56,7 @@ class VkAgent(VkSearch):
 			self.step_handler_func = 2
 			self.waiting_message = True
 			return None
-			# return [None, True, None, 0, True, 2]
+
 		else:
 			self.step_handler_func = 3
 			self.waiting_message = False
