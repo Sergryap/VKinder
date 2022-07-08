@@ -147,8 +147,9 @@ class DBConnect(DbMethods):
                 month = month if month > 9 else str(f"0{month}")
                 day = day if day > 9 else str(f"0{day}")
                 return date.fromisoformat(f'{year}-{month}-{day}')
-            return f"{self.user_info['year_birth']}-01-01"
-        elif self.step_handler_func == 2:
+            elif self.step_handler_func == 3:
+                return f"{self.user_info['year_birth']}-01-01"
+        elif self.step_handler_func == 3:
             return f"{self.user_info['year_birth']}-01-01"
 
 
