@@ -137,6 +137,7 @@ class DBConnect(DbMethods):
 
     def date_format(self, birth_date: str):
         """Запись даты в формате fromisoformat"""
+
         if birth_date:
             if len(birth_date.split(".")) == 3:
                 date_info = time.strptime(birth_date, "%d.%m.%Y")
@@ -147,7 +148,8 @@ class DBConnect(DbMethods):
                 day = day if day > 9 else str(f"0{day}")
                 return date.fromisoformat(f'{year}-{month}-{day}')
             return f"{self.user_info['year_birth']}-01-01"
-        return f"{self.user_info['year_birth']}-01-01"
+        elif self.step_handler_func == 2:
+            return f"{self.user_info['year_birth']}-01-01"
 
 
 def db_connect(table, method, flag=None):
