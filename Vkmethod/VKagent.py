@@ -17,7 +17,7 @@ class VkAgent(VkSearch):
 		self.user_id = user_id
 		self.vk_session = vk_api.VkApi(token=self.token_bot)
 		self.result = [None, None, None, None, None, 1]
-		self.search_flag = True
+		self.search_flag = True  # флаг, указывающий на необходимость формирования временного списка к выдаче
 		self.search_info = []  # хранит временный список подходящих пользователей к выдаче
 		self.step = 0  # хранит индекс из списка подходящих пользователей к выводу из self.search_info
 		self.user_info = []  # хранит данные о текущем пользователе, общающимся с ботом
