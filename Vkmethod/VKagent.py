@@ -9,20 +9,7 @@ from Date_base.DecorDB import db_connect
 
 class VkAgent(VkSearch):
 	"""
-	В основной функции handler_func() класса VkAgent используется параметр result.
-	Данными содержащимимся в этом параметре происходит управление логикой взаимодействия бота с пользователем.
-	Кроме того, он служит для временного хранения промежуточных данных и передаче их между шагами цикла.
-	result[0] - хранит данные о текущем пользователе в чате
-	result[1] - при первом обращении заносится флаг о необходимости запроса возраста при недостатке данных о возрасте.
-	При последующих обращения хранит информацию о небходимости формирования временного списка подходящих пользователей
-	result[2] - хранит временный список подходящих пользователей
-	result[3] - хранит индекс из списка подходящих пользователей к выводу для self.user_id
-	result[4] - хранит флаг о необходимости прерывания цикла, в котором выполняется функция handler_func,
-	в случае ожидания сообщения от пользователя
-	result[5] - хранит флаг, указывающий на необходимость вызова функции обновления данных о возрасте,
-	после его указания пользователем
-	result[6] - индекс формируется по ходу выполнения и хранит информацию о только что
-	выведенном пользователе для занесения его в избранные в случае необходимости
+	Основной класс взаимодействия пользователя и бота
 	"""
 
 	def __init__(self, user_id):
@@ -30,32 +17,51 @@ class VkAgent(VkSearch):
 		self.user_id = user_id
 		self.vk_session = vk_api.VkApi(token=self.token_bot)
 		self.result = [None, None, None, None, None, 1]
+		self.search_flag = True
+		self.search_info = []  # хранит временный список подходящих пользователей к выдаче
+		self.step = 0  # хранит индекс из списка подходящих пользователей к выводу из self.search_info
+		self.user_info = []  # хранит данные о текущем пользователе, общающимся с ботом
+		self.enter_age = None  # флаг о необходимости запроса возраста при недостатке данных о возрасте
+		self.exit_flag = None  # флаг о нежелании пользователя продолжать общение
+		self.step_handler_func = 1  # флаг о текущем шаге выполнения функции
+		self.waiting_message = False    # флаг ожидания сообщения от пользователя
+		self.current_user = {}  # хранит информацию о только что выведенном пользователе для занесения его в избранные в случае необходимости
 
 	def handler_func(self):
 		"""Функция-обработчик событий сервера типа MESSAGE_NEW"""
-		if self.result[5] == 1:
+		if self.step_handler_func == 1:
 			return self.get_data_user()
-		if self.result[2] in [2, 3]:
-			return [None, None, None, None, True, 1]
-		if self.result[5] == 2:
+		if self.exit_flag in [2, 3]:
+			self.exit_flag = None
+			self.step_handler_func = 1
+			self.waiting_message = True
+			return None
+
+		if self.step_handler_func == 2:
 			return self.step_2_func()
 		else:
 			return self.step_other_func()
 
 	def step_2_func(self):
 		"""Функция-обработчик сообщения от пользователя после ввода возраста"""
-		user_info = self.result[0]
-		enter_age = self.result[1]
-		if enter_age and self.msg.isdigit():
+		if self.enter_age and self.msg.isdigit():
 			age = int(self.msg)
-			self.update_year_birth(user_info, age)
-			return [user_info, True, None, 0, False, 3]
-		elif enter_age and not self.msg.isdigit():
+			self.update_year_birth(age)
+			self.step_handler_func = 3
+			self.waiting_message = False
+			return None
+
+		elif self.enter_age and not self.msg.isdigit():
 			self.send_message("Введите верный возраст")
 			# Если возраст введен не верно уходим на второй круг и т.д.
-			return [user_info, True, None, 0, True, 2]
+			self.step_handler_func = 2
+			self.waiting_message = True
+			return None
+			# return [None, True, None, 0, True, 2]
 		else:
-			return [user_info, True, None, 0, False, 3]
+			self.step_handler_func = 3
+			self.waiting_message = False
+			return None
 
 	def step_other_func(self):
 		"""Функция-обработчик остальных сообщений пользователя"""
@@ -69,27 +75,26 @@ class VkAgent(VkSearch):
 			return self.restart()
 		if self.msg == 'очистить избранное':
 			return self.favorite_clear()
-		user_info = self.result[0]
-		search_flag = self.result[1]
-		search_info = self.result[2]
-		step = self.result[3]
-		if search_flag:
+		if self.search_flag:
 			self.send_message("Немного подождите. Получаем данные...")
 			if not self.merging_user_from_bd:
-				search_info = self.users_search(user_info)
+				self.search_info = self.users_search()
 			else:
-				search_info = self.get_merging_user_db()
-			search_flag = False
-			return [user_info, search_flag, search_info, step, False, None]
+				self.search_info = self.get_merging_user_db()
+			self.search_flag = False
+			self.waiting_message = False
+			return None
+
 		else:
-			value = search_info[step]
-			step += 1
-			self.send_info_users(value)
+			self.current_user = self.search_info[self.step]
+			self.step += 1
+			self.send_info_users()
+			self.waiting_message = True
 			self.send_message("Выберите действие", buttons=self.number_buttons(2))
-			if step == len(search_info):
-				step = 0
-				search_flag = True
-			return [user_info, search_flag, search_info, step, True, None, value]
+			if self.step == len(self.search_info):
+				self.step = 0
+				self.search_flag = True
+			return None
 
 	def get_data_user(self):
 		"""
@@ -97,14 +102,16 @@ class VkAgent(VkSearch):
 		:return: словарь с данными о пользователе и флаг
 		enter_age: bool, указывающий на необходимость запроса возраста
 		"""
-		enter_age = False
-		user_info = self.get_info_users_db()
-		user_info = self.get_info_users() if not user_info else user_info
-		exit_flag = self.messages_var()
-		if not user_info['year_birth'] and not exit_flag:
+		self.enter_age = False
+		self.user_info = self.get_info_users_db()
+		self.user_info = self.get_info_users() if not self.user_info else self.user_info
+		self.exit_flag = self.messages_var()
+		if not self.user_info['year_birth'] and not self.exit_flag:
 			self.send_message("Укажите ваш возраст")
-			enter_age = True
-		return [user_info, enter_age, exit_flag, None, enter_age, 2]
+			self.enter_age = True
+		self.step_handler_func = 2
+		self.waiting_message = self.enter_age
+		return None
 
 	def send_message(self, some_text, button=False, buttons=False, title=''):
 		"""
@@ -209,21 +216,20 @@ class VkAgent(VkSearch):
 		"""
 		Добавление пользователя в избранные
 		"""
-		# self.fav.append(self.result[6])
-		send_msg = f"Пользователь {self.result[6]['merging_user_id']}:\n{self.result[6]['first_name']} {self.result[6]['last_name']} добавлен в избранное"
+		send_msg = f"Пользователь {self.current_user['merging_user_id']}:\n{self.current_user['first_name']} {self.current_user['last_name']} добавлен в избранное"
 		self.send_message(send_msg)
 		self.send_message("Выберите действие", buttons=self.number_buttons(2))
-		return self.result
+		return None
 
 	@db_connect(table="MergingUser", method="update", flag="black")
 	def add_black_list(self):
 		"""
 		Добавление пользователя в black_list
 		"""
-		send_msg = f"Пользователь {self.result[6]['merging_user_id']}:\n{self.result[6]['first_name']} {self.result[6]['last_name']} добавлен в стоп-лист"
+		send_msg = f"Пользователь {self.current_user['merging_user_id']}:\n{self.current_user['first_name']} {self.current_user['last_name']} добавлен в стоп-лист"
 		self.send_message(send_msg)
 		self.send_message("Выберите действие", buttons=self.number_buttons(2))
-		return self.result
+		return None
 
 	def get_favorite(self):
 		"""
@@ -237,35 +243,34 @@ class VkAgent(VkSearch):
 		info_send += f'{"♥" * 10}\n'
 		self.send_message(info_send)
 		self.send_message("Выберите действие:", buttons=self.number_buttons(3))
-		return self.result
+		return None
 
 	def favorite_clear(self):
 		self.favorite_clear_db()
 		self.send_message("Список избранных очищен.")
 		self.send_message("Выберите действие", buttons=self.number_buttons(2))
-		return self.result
+		return None
 
 	def restart(self):
 		"""
 		Установка параметров для начала обхода подходящих пользователей
 		из имеющихся уже в БД
 		"""
-		search_flag = True
-		search_info = None
-		value = self.result[6]
-		step = 0
-		user_info = self.result[0]
+		self.search_flag = True
+		self.search_info = None
+		self.step = 0
 		self.merging_user_from_bd = True
 		self.send_message("Выберите действие", buttons=self.number_buttons(2))
-		return [user_info, search_flag, search_info, step, True, None, value]
+		self.waiting_message = True
+		return None
 
-	def send_info_users(self, value):
+	def send_info_users(self):
 		"""
 		Отправка информации о следующем найденном пользователе
 		"""
-		info = f"{value['first_name']} {value['last_name']} {value['url']}\n"
+		info = f"{self.current_user['first_name']} {self.current_user['last_name']} {self.current_user['url']}\n"
 		self.send_message(info)
-		self.send_top_photos(value['merging_user_id'])
+		self.send_top_photos(self.current_user['merging_user_id'])
 
 
 if __name__ == '__main__':

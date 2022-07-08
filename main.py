@@ -33,8 +33,8 @@ def user_bot():
 					else:
 						exec(f"id_{user_id}.msg = '{msg}'")
 					while True:
-						exec(f"id_{user_id}.result = id_{user_id}.handler_func()")
-						x = compile(f"id_{user_id}.result[4]", "test", "eval")
+						exec(f"id_{user_id}.handler_func()")
+						x = compile(f"id_{user_id}.waiting_message", "test", "eval")
 						if eval(x):
 							break
 			if event.type == VkEventType.USER_OFFLINE:

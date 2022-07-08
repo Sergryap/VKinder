@@ -24,7 +24,7 @@ class DBConnect(DbMethods):
             if table == "User":
                 self.update_db_year_birth(data)
             elif table == "MergingUser":
-                self.add_favorite_black(data[6]["merging_user_id"], flag=flag)
+                self.add_favorite_black(self.current_user["merging_user_id"], flag=flag)
         if method == "delete":
             self.delete_data_table(table)
 
@@ -146,8 +146,8 @@ class DBConnect(DbMethods):
                 month = month if month > 9 else str(f"0{month}")
                 day = day if day > 9 else str(f"0{day}")
                 return date.fromisoformat(f'{year}-{month}-{day}')
-            return f"{self.result[0]['year_birth']}-01-01"
-        return f"{self.result[0]['year_birth']}-01-01"
+            return f"{self.user_info['year_birth']}-01-01"
+        return f"{self.user_info['year_birth']}-01-01"
 
 
 def db_connect(table, method, flag=None):

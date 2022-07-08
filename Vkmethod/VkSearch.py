@@ -111,15 +111,15 @@ class VkSearch(DBConnect):
                     return sorted(total_photos_info, key=key_sort, reverse=True)
 
     @db_connect(table="MergingUser", method="insert")
-    def users_search(self, users_info):
+    def users_search(self):
         """
-        Поиск подходящих пользователей по данным users_info
+        Поиск подходящих пользователей по данным self.user_info
         Декоратором данные заносятся в таблицу merging_user
         """
         year_now = dt.datetime.date(dt.datetime.now()).year
-        year_birth = users_info['year_birth']
-        city = users_info['city_id']
-        sex = 1 if users_info['sex'] == 2 else 2
+        year_birth = self.user_info['year_birth']
+        city = self.user_info['city_id']
+        sex = 1 if self.user_info['sex'] == 2 else 2
         age_from = year_now - year_birth - 1
         age_to = year_now - year_birth + 1
         fields = 'country,sex,city,bdate'
@@ -157,7 +157,7 @@ class VkSearch(DBConnect):
         if not users_search:
             self.user_offset_clear_db()
             self.search_offset = 0
-            return self.users_search(users_info)
+            return self.users_search()
         return users_search
 
     def _users_lock(self, user_id):
@@ -209,14 +209,14 @@ class VkSearch(DBConnect):
         return birth_date, birth_year
 
     @db_connect(table="User", method="update")
-    def update_year_birth(self, user_info: dict, age: int):
+    def update_year_birth(self, age: int):
         """
         Обновление данных о годе рождения в словаре user_info на основании указанного возраста
         Декоратором данные обновляются в БД
         """
         year_now = dt.datetime.date(dt.datetime.now()).year
         birth_year = year_now - age
-        user_info['year_birth'] = birth_year
+        self.user_info['year_birth'] = birth_year
         return birth_year
 
 
