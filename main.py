@@ -1,3 +1,6 @@
+# При слиянии веток немного ошибся, выбрав не main. Поэтому пришлось продолжить в ветке keyboard
+# и сделать ее по умолчанию. Думаю не критично.
+
 import requests
 import vk_api
 from vk_api.longpoll import VkLongPoll, VkEventType
