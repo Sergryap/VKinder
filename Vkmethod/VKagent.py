@@ -98,8 +98,6 @@ class VkAgent(VkSearch):
 	def get_data_user(self):
 		"""
 		Получение данных о пользователе при первом обращении к боту
-		:return: словарь с данными о пользователе и флаг
-		enter_age: bool, указывающий на необходимость запроса возраста
 		"""
 		self.enter_age = False
 		self.user_info = self.get_info_users_db()
